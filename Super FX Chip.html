@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>STAR FOX: INVADERS - Super FX 3D</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #05050d;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #game-container {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      background: #000;
+      box-shadow: 0 0 30px rgba(0, 180, 255, 0.4), 0 0 10px rgba(0,0,0,0.8);
+      border: 4px solid #203870;
+      border-radius: 6px;
+      image-rendering: pixelated;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* Efeito sutil de linhas de CRT de TV de tubo */
+    #crt-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-element {
+      position: absolute;
+      z-index: 5;
+      font-weight: bold;
+      text-shadow: 2px 2px #000;
+      letter-spacing: 1px;
+    }
+    #shield-container {
+      top: 15px; left: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #38b6ff;
+    }
+    #shield-bar-bg {
+      width: 160px;
+      height: 12px;
+      background: #112233;
+      border: 2px solid #38b6ff;
+      padding: 1px;
+    }
+    #shield-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: #00ff66;
+      transition: width 0.2s, background-color 0.2s;
+    }
+    #score-box {
+      top: 15px; right: 20px;
+      font-size: 18px;
+      color: #ffcc00;
+      text-align: right;
+    }
+    #bombs-box {
+      top: 35px; left: 20px;
+      font-size: 12px;
+      color: #ff4444;
+    }
+    /* Star Fox Radio Comms Window */
+    #radio-box {
+      position: absolute;
+      bottom: 12px; left: 50%;
+      transform: translateX(-50%);
+      width: 620px;
+      height: 72px;
+      background: rgba(10, 20, 45, 0.9);
+      border: 3px solid #38b6ff;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      gap: 15px;
+      z-index: 8;
+      box-shadow: inset 0 0 12px rgba(0, 180, 255, 0.4);
+    }
+    #radio-portrait {
+      width: 54px;
+      height: 54px;
+      border: 2px solid #5599ff;
+      background: #000;
+      flex-shrink: 0;
+    }
+    #radio-text-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #radio-caller {
+      font-size: 13px;
+      color: #ffbb00;
+      margin-bottom: 3px;
+    }
+    #radio-msg {
+      font-size: 13px;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+    /* Telas de Título / Game Over */
+    #screen-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 5, 20, 0.85);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .btn {
+      background: #204090;
+      border: 2px solid #38b6ff;
+      color: #fff;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 10px 24px;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: 0.1s;
+      box-shadow: 0 0 10px #204090;
+    }
+    .btn:hover {
+      background: #38b6ff;
+      color: #000;
+      box-shadow: 0 0 20px #38b6ff;
+    }
+    .controls-hint {
+      margin-top: 15px;
+      font-size: 12px;
+      color: #88aacc;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <canvas id="gameCanvas" width="640" height="480"></canvas>
+  <div id="crt-overlay"></div>
+
+  <!-- HUD -->
+  <div id="shield-container" class="hud-element">
+    <span>SHIELD</span>
+    <div id="shield-bar-bg"><div id="shield-bar-fill"></div></div>
+  </div>
+  <div id="bombs-box" class="hud-element">NOVA BOMBS: <span id="bombs-count">2</span> [B]</div>
+  <div id="score-box" class="hud-element">
+    <div>SCORE <span id="score-val">00000</span></div>
+    <div style="font-size: 12px; color: #aaa;">STAGE <span id="stage-val">1</span></div>
+  </div>
+
+  <!-- Star Fox Radio Window -->
+  <div id="radio-box">
+    <canvas id="radio-portrait" width="48" height="48"></canvas>
+    <div id="radio-text-box">
+      <div id="radio-caller">PEPPY</div>
+      <div id="radio-msg">Invader armada detected! All craft prepare for launch!</div>
+    </div>
+  </div>
+
+  <!-- Start / Game Over Overlay -->
+  <div id="screen-overlay">
+    <h1 id="screen-title" style="font-size: 32px; color: #ff3344; letter-spacing: 3px; text-shadow: 0 0 15px #ff2200;">STAR FOX</h1>
+    <h2 style="font-size: 18px; color: #38b6ff; margin-bottom: 15px; letter-spacing: 2px;">SPACE INVADERS : SUPER FX</h2>
+    <p id="screen-desc" style="color: #ccddee; max-width: 480px; font-size: 13px; line-height: 1.4;">
+      A frota espacial dos Invaders de Venom está atacando em formação clássica!<br>
+      Abata as fileiras antes que desçam até a sua posição!
+    </p>
+    <div class="controls-hint">
+      <strong>CONTROLES:</strong><br>
+      [W, A, S, D] ou [SETAS] - Pilotar a Arwing<br>
+      [ESPAÇO] ou [CLIQUE ESQ] - Disparar Laser<br>
+      [E] ou [DUPLO TOQUE A/D] - <b>BARREL ROLL</b> (Reflete tiros!)<br>
+      [B] ou [SHIFT] - Lançar Nova Bomb
+    </div>
+    <button class="btn" id="start-btn">INICIAR MISSÃO</button>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   STAR FOX: SPACE INVADERS (SUPER FX 3D ENGINE MONOLÍTICO)
+   ========================================================================== */
+
+// --- SINTETIZADOR DE ÁUDIO WEB (SEM DEPENDÊNCIAS EXTERNAS) ---
+class RetroAudio {
+  constructor() {
+    this.ctx = null;
+    this.marchNotes = [110, 103, 98, 92]; // Dun... dun... dun... dun...
+    this.marchIdx = 0;
+  }
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioCtx();
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+  playLaser() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.exponentialRampToValueAtTime(120, t + 0.12);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.12);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.12);
+  }
+  playEnemyLaser() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.linearRampToValueAtTime(140, t + 0.15);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.15);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  }
+  playInvaderStep() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    const freq = this.marchNotes[this.marchIdx % 4];
+    this.marchIdx++;
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, t + 0.08);
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.08);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.08);
+  }
+  playExplosion(big = false) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const dur = big ? 0.6 : 0.25;
+    const bufferSize = this.ctx.sampleRate * dur;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(big ? 450 : 800, t);
+    filter.frequency.linearRampToValueAtTime(40, t + dur);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(big ? 0.45 : 0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    noise.start(t);
+  }
+  playBarrelRoll() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(260, t);
+    osc.frequency.exponentialRampToValueAtTime(800, t + 0.25);
+    osc.frequency.exponentialRampToValueAtTime(300, t + 0.5);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.5);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  }
+  playDeflect() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1200, t);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.08);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.08);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.08);
+  }
+  playChatterBeep(pitchMod = 1) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime((240 + Math.random() * 80) * pitchMod, t);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.linearRampToValueAtTime(0.01, t + 0.05);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.05);
+  }
+}
+const audio = new RetroAudio();
+
+// --- RETRO DIALOGUE & RADIO CHATTER SYSTEM ---
+const Comms = {
+  queue: [],
+  currentMsg: null,
+  charIndex: 0,
+  tick: 0,
+  chars: {
+    FOX:   { name: "FOX McCLOUD", color: "#66ccff", pitch: 1.1, eyeColor: "#2277bb" },
+    PEPPY: { name: "PEPPY HARE",  color: "#ffaa33", pitch: 0.9, eyeColor: "#cc6622" },
+    FALCO: { name: "FALCO LOMBARDI", color: "#3399ff", pitch: 1.3, eyeColor: "#0044aa" },
+    SLIPPY:{ name: "SLIPPY TOAD", color: "#66ff66", pitch: 1.6, eyeColor: "#22aa44" }
+  },
+  say(speaker, text) {
+    this.queue.push({ speaker, text, time: Date.now() });
+    if (!this.currentMsg) this.next();
+  },
+  next() {
+    if (this.queue.length === 0) {
+      this.currentMsg = null;
+      return;
+    }
+    this.currentMsg = this.queue.shift();
+    this.charIndex = 0;
+    this.tick = 0;
+    const callerElem = document.getElementById("radio-caller");
+    callerElem.innerText = this.chars[this.currentMsg.speaker].name;
+    callerElem.style.color = this.chars[this.currentMsg.speaker].color;
+  },
+  update() {
+    if (!this.currentMsg) return;
+    this.tick++;
+    const msgElem = document.getElementById("radio-msg");
+    if (this.charIndex < this.currentMsg.text.length) {
+      if (this.tick % 2 === 0) {
+        this.charIndex++;
+        msgElem.innerText = this.currentMsg.text.substring(0, this.charIndex);
+        if (this.charIndex % 2 === 0) {
+          audio.playChatterBeep(this.chars[this.currentMsg.speaker].pitch);
+        }
+      }
+    } else {
+      // Mensagem completa: aguarda 2.8s para a próxima
+      if (this.tick > this.currentMsg.text.length * 2 + 120) {
+        this.next();
+      }
+    }
+    this.drawPortrait();
+  },
+  drawPortrait() {
+    const pCanvas = document.getElementById("radio-portrait");
+    const pCtx = pCanvas.getContext("2d");
+    pCtx.fillStyle = "#000818";
+    pCtx.fillRect(0, 0, 48, 48);
+
+    if (!this.currentMsg) return;
+    const ch = this.chars[this.currentMsg.speaker];
+    const isTalking = this.charIndex < this.currentMsg.text.length && (this.tick % 6 < 3);
+
+    // Renderiza rosto estilizado pixel-art do personagem
+    pCtx.fillStyle = ch.color;
+    pCtx.fillRect(12, 10, 24, 26); // Cabeça base
+    pCtx.fillStyle = "#ffffff";
+    pCtx.fillRect(16, 18, 6, 6);   // Olhos
+    pCtx.fillRect(26, 18, 6, 6);
+    pCtx.fillStyle = ch.eyeColor;
+    pCtx.fillRect(18, 20, 3, 3);
+    pCtx.fillRect(28, 20, 3, 3);
+
+    // Boca animada falando
+    pCtx.fillStyle = "#000";
+    if (isTalking) {
+      pCtx.fillRect(20, 29, 8, 5);
+    } else {
+      pCtx.fillRect(21, 31, 6, 2);
+    }
+    // Fone de comunicação
+    pCtx.fillStyle = "#ffcc00";
+    pCtx.fillRect(8, 18, 4, 10);
+    pCtx.fillRect(36, 18, 4, 10);
+    pCtx.fillRect(12, 10, 24, 3);
+  }
+};
+
+/* ==========================================================================
+   MOTOR GRÁFICO 3D (SUPER FX STYLE ENGINE)
+   ========================================================================== */
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const FOV = 280;
+const HALF_W = canvas.width / 2;
+const HALF_H = canvas.height / 2;
+
+// Transformação de rotações
+function rotateX(p, a) {
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return { x: p.x, y: p.y * cos - p.z * sin, z: p.y * sin + p.z * cos };
+}
+function rotateY(p, a) {
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return { x: p.x * cos + p.z * sin, y: p.y, z: -p.x * sin + p.z * cos };
+}
+function rotateZ(p, a) {
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos, z: p.z };
+}
+
+// Modelos Poligonais Low-Poly (Estilo SNES Super FX)
+const MODELS = {
+  // Arwing de Fox McCloud
+  ARWING: {
+    verts: [
+      {x: 0, y: 0, z: 28},    // 0: Nariz
+      {x: -4, y: 1.5, z: 4},  // 1: Fuselagem esq
+      {x: 4, y: 1.5, z: 4},   // 2: Fuselagem dir
+      {x: 0, y: 3.5, z: 8},   // 3: Topo Cabine
+      {x: 0, y: -2, z: 2},    // 4: Fundo
+      {x: -24, y: 0.5, z: -8},// 5: Ponta asa esq
+      {x: 24, y: 0.5, z: -8}, // 6: Ponta asa dir
+      {x: -6, y: 0, z: -10},  // 7: Traseira asa esq
+      {x: 6, y: 0, z: -10},   // 8: Traseira asa dir
+      {x: 0, y: 8, z: -8},    // 9: Leme vertical
+      {x: 0, y: 0, z: -12}    // 10: Escape do Motor
+    ],
+    faces: [
+      { v: [0, 3, 1], c: [210, 220, 240] }, // Nariz esq
+      { v: [0, 2, 3], c: [230, 235, 255] }, // Nariz dir
+      { v: [0, 1, 4], c: [140, 150, 170] }, // Nariz baixo esq
+      { v: [0, 4, 2], c: [160, 170, 190] }, // Nariz baixo dir
+      { v: [1, 3, 2], c: [0, 180, 240] },   // Vidro Cabine
+      { v: [1, 5, 7], c: [30, 80, 220] },   // Asa Esq (Azul Star Fox)
+      { v: [2, 8, 6], c: [30, 80, 220] },   // Asa Dir (Azul Star Fox)
+      { v: [1, 7, 10], c: [180, 190, 210]}, // Corpo Traseiro Esq
+      { v: [2, 10, 8], c: [190, 200, 220]}, // Corpo Traseiro Dir
+      { v: [3, 9, 10], c: [220, 40, 40] },  // Leme Vermelho
+      { v: [4, 7, 10], c: [100, 110, 130]}, // Fundo Traseiro
+      { v: [4, 10, 8], c: [110, 120, 140]}
+    ]
+  },
+  // Invasor Tipo 1 (Lula Espacial / Linha de trás)
+  SQUID: {
+    verts: [
+      {x: 0, y: 12, z: 0},
+      {x: -10, y: -2, z: 6},
+      {x: 10, y: -2, z: 6},
+      {x: 0, y: -4, z: -8},
+      {x: -8, y: -12, z: 4},
+      {x: 8, y: -12, z: 4}
+    ],
+    faces: [
+      { v: [0, 1, 2], c: [240, 40, 140] },
+      { v: [0, 2, 3], c: [190, 20, 100] },
+      { v: [0, 3, 1], c: [220, 30, 120] },
+      { v: [1, 4, 2], c: [160, 10, 80] },
+      { v: [2, 4, 5], c: [255, 60, 180] }
+    ]
+  },
+  // Invasor Tipo 2 (Caranguejo Espacial / Linha do meio)
+  CRAB: {
+    verts: [
+      {x: -12, y: 4, z: 0}, {x: 12, y: 4, z: 0},
+      {x: -16, y: -4, z: 0}, {x: 16, y: -4, z: 0},
+      {x: -6, y: -10, z: 4}, {x: 6, y: -10, z: 4},
+      {x: 0, y: 10, z: 4},   {x: 0, y: 0, z: -6}
+    ],
+    faces: [
+      { v: [0, 6, 1], c: [0, 230, 120] },
+      { v: [0, 2, 4], c: [0, 180, 80] },
+      { v: [1, 5, 3], c: [0, 180, 80] },
+      { v: [0, 4, 7], c: [0, 140, 60] },
+      { v: [1, 7, 5], c: [0, 140, 60] },
+      { v: [4, 5, 7], c: [30, 255, 160] }
+    ]
+  },
+  // Invasor Tipo 3 (Polvo Espacial / Linha de frente)
+  OCTOPUS: {
+    verts: [
+      {x: 0, y: 10, z: 4},
+      {x: -12, y: 2, z: 4}, {x: 12, y: 2, z: 4},
+      {x: -8, y: -8, z: 2}, {x: 8, y: -8, z: 2},
+      {x: 0, y: -10, z: -4}, {x: 0, y: 2, z: -8}
+    ],
+    faces: [
+      { v: [0, 1, 2], c: [255, 190, 0] },
+      { v: [1, 3, 5], c: [210, 140, 0] },
+      { v: [2, 5, 4], c: [210, 140, 0] },
+      { v: [0, 2, 6], c: [255, 220, 50] },
+      { v: [0, 6, 1], c: [180, 110, 0] },
+      { v: [3, 4, 5], c: [255, 160, 0] }
+    ]
+  },
+  // Mothership Espacial (Disco Voador clássico)
+  UFO: {
+    verts: [
+      {x: 0, y: 8, z: 0},
+      {x: -26, y: 0, z: 0}, {x: 0, y: 0, z: 26},
+      {x: 26, y: 0, z: 0},  {x: 0, y: 0, z: -26},
+      {x: 0, y: -6, z: 0}
+    ],
+    faces: [
+      { v: [0, 1, 2], c: [255, 30, 30] },
+      { v: [0, 2, 3], c: [255, 80, 80] },
+      { v: [0, 3, 4], c: [220, 20, 20] },
+      { v: [0, 4, 1], c: [200, 10, 10] },
+      { v: [5, 2, 1], c: [255, 200, 0] },
+      { v: [5, 3, 2], c: [255, 230, 60] },
+      { v: [5, 4, 3], c: [200, 160, 0] },
+      { v: [5, 1, 4], c: [180, 140, 0] }
+    ]
+  },
+  // Bloco de Bunker de Proteção
+  BUNKER: {
+    verts: [
+      {x: -6, y: -6, z: -6}, {x: 6, y: -6, z: -6},
+      {x: 6, y: 6, z: -6},   {x: -6, y: 6, z: -6},
+      {x: -6, y: -6, z: 6},  {x: 6, y: -6, z: 6},
+      {x: 6, y: 6, z: 6},    {x: -6, y: 6, z: 6}
+    ],
+    faces: [
+      { v: [0, 1, 2], c: [0, 180, 140] }, { v: [0, 2, 3], c: [0, 180, 140] },
+      { v: [5, 4, 7], c: [0, 240, 190] }, { v: [5, 7, 6], c: [0, 240, 190] },
+      { v: [4, 0, 3], c: [0, 140, 100] }, { v: [4, 3, 7], c: [0, 140, 100] },
+      { v: [1, 5, 6], c: [0, 160, 120] }, { v: [1, 6, 2], c: [0, 160, 120] },
+      { v: [3, 2, 6], c: [0, 220, 170] }, { v: [3, 6, 7], c: [0, 220, 170] }
+    ]
+  }
+};
+
+/* ==========================================================================
+   ESTADO E VARIÁVEIS DE JOGO
+   ========================================================================== */
+let gameState = 'START'; // 'START', 'PLAY', 'GAMEOVER', 'VICTORY'
+let score = 0;
+let stage = 1;
+let shield = 100;
+let bombs = 2;
+
+// Controle da Nave Jogador (Arwing)
+const player = {
+  x: 0,
+  y: -10,
+  z: 30,
+  vx: 0,
+  vy: 0,
+  rotX: 0,
+  rotY: 0,
+  rotZ: 0,
+  targetRotZ: 0,
+  barrelRolling: false,
+  barrelRollAngle: 0,
+  speed: 1.8,
+  cooldown: 0,
+  lastDirKey: null,
+  lastDirTime: 0
+};
+
+// Formação dos Space Invaders
+const fleet = {
+  x: 0,
+  y: 40,
+  z: 420,
+  dir: 1,
+  speed: 0.7,
+  stepTimer: 0,
+  stepInterval: 50, // Vai acelerando quanto menos invasores restarem!
+  stepZAdvance: 20, // Avanço em profundidade em direção ao jogador
+  aliens: []
+};
+
+// Entidades ativas
+let playerLasers = [];
+let alienLasers = [];
+let particles = [];
+let bunkers = [];
+let ufo = null;
+let ufoTimer = 0;
+
+// Grade e estrelas do cenário Star Fox
+const stars = [];
+for (let i = 0; i < 90; i++) {
+  stars.push({
+    x: (Math.random() - 0.5) * 600,
+    y: (Math.random() - 0.5) * 450,
+    z: Math.random() * 600 + 50,
+    speed: Math.random() * 2 + 3
+  });
+}
+
+// Inicializa ou Reseta Bunkers
+function initBunkers() {
+  bunkers = [];
+  const bunkerPositions = [-90, -30, 30, 90];
+  bunkerPositions.forEach(bx => {
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 3; c++) {
+        // Deixa abertura no meio inferior como no Space Invaders original
+        if (r === 0 && c === 1) continue;
+        bunkers.push({
+          x: bx + (c - 1) * 12,
+          y: -15 + r * 12,
+          z: 110,
+          hp: 3
+        });
+      }
+    }
+  });
+}
+
+// Cria a Formação Invasora (Space Invaders)
+function initFleet() {
+  fleet.aliens = [];
+  fleet.x = 0;
+  fleet.y = 35;
+  fleet.z = 420;
+  fleet.dir = 1;
+  fleet.speed = 0.8 + stage * 0.15;
+  fleet.stepInterval = Math.max(16, 50 - stage * 5);
+
+  const cols = 6;
+  const rows = 3;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      let type = 'OCTOPUS';
+      let pts = 10;
+      if (r === 1) { type = 'CRAB'; pts = 20; }
+      else if (r === 2) { type = 'SQUID'; pts = 30; }
+
+      fleet.aliens.push({
+        col: c,
+        row: r,
+        type: type,
+        pts: pts,
+        relX: (c - (cols - 1) / 2) * 28,
+        relY: (r - (rows - 1) / 2) * 22,
+        alive: true
+      });
+    }
+  }
+}
+
+/* ==========================================================================
+   INPUTS (TECLADO / MOUSE)
+   ========================================================================== */
+const keys = {};
+
+window.addEventListener('keydown', e => {
+  audio.init();
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+
+  // Lançamento de Bomba Nova
+  if ((k === 'b' || e.key === 'Shift') && gameState === 'PLAY') {
+    fireNovaBomb();
+  }
+
+  // Atalho do Barrel Roll
+  if (k === 'e' && gameState === 'PLAY') {
+    triggerBarrelRoll();
+  }
+
+  // Detecção de Duplo Toque [A/D] ou [Setas] para Barrel Roll genuíno do SNES
+  if ((k === 'a' || k === 'd' || k === 'arrowleft' || k === 'arrowright') && gameState === 'PLAY') {
+    const now = Date.now();
+    if (player.lastDirKey === k && now - player.lastDirTime < 280) {
+      triggerBarrelRoll();
+    }
+    player.lastDirKey = k;
+    player.lastDirTime = now;
+  }
+});
+
+window.addEventListener('keyup', e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+function triggerBarrelRoll() {
+  if (player.barrelRolling) return;
+  player.barrelRolling = true;
+  player.barrelRollAngle = 0;
+  audio.playBarrelRoll();
+
+  const rolls = [
+    { s: "PEPPY", m: "DO A BARREL ROLL!" },
+    { s: "FALCO", m: "Keep rolling, Fox!" },
+    { s: "SLIPPY", m: "Deflect their lasers!" }
+  ];
+  const r = rolls[Math.floor(Math.random() * rolls.length)];
+  Comms.say(r.s, r.m);
+}
+
+function fireNovaBomb() {
+  if (bombs <= 0) return;
+  bombs--;
+  document.getElementById("bombs-count").innerText = bombs;
+  audio.playExplosion(true);
+  Comms.say("FOX", "Smart Bomb deployed!");
+
+  // Elimina lasers inimigos e causa grande dano à frota
+  alienLasers = [];
+  fleet.aliens.forEach(a => {
+    if (a.alive && Math.random() < 0.75) {
+      killAlien(a);
+    }
+  });
+  // Flash de tela
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// Início de Missão
+document.getElementById("start-btn").addEventListener("click", () => {
+  audio.init();
+  document.getElementById("screen-overlay").style.display = "none";
+  resetGame();
+});
+
+function resetGame() {
+  score = 0;
+  stage = 1;
+  shield = 100;
+  bombs = 2;
+  updateHUD();
+  initBunkers();
+  initFleet();
+  gameState = 'PLAY';
+  Comms.say("PEPPY", "All aircraft report in! Space Invaders spotted!");
+  setTimeout(() => Comms.say("SLIPPY", "Hold them off, Fox!"), 2500);
+}
+
+function updateHUD() {
+  document.getElementById("score-val").innerText = String(score).padStart(5, '0');
+  document.getElementById("stage-val").innerText = stage;
+  document.getElementById("bombs-count").innerText = bombs;
+  const bar = document.getElementById("shield-bar-fill");
+  bar.style.width = Math.max(0, shield) + "%";
+  if (shield > 50) bar.style.backgroundColor = "#00ff66";
+  else if (shield > 25) bar.style.backgroundColor = "#ffcc00";
+  else bar.style.backgroundColor = "#ff2222";
+}
+
+/* ==========================================================================
+   LOOP DE ATUALIZAÇÃO / FÍSICA
+   ========================================================================== */
+function update() {
+  Comms.update();
+
+  if (gameState !== 'PLAY') return;
+
+  // Movimento da Arwing
+  let moveX = 0;
+  let moveY = 0;
+  if (keys['a'] || keys['arrowleft'])  moveX -= 1;
+  if (keys['d'] || keys['arrowright']) moveX += 1;
+  if (keys['w'] || keys['arrowup'])    moveY += 1;
+  if (keys['s'] || keys['arrowdown'])  moveY -= 1;
+
+  player.vx += moveX * 0.45;
+  player.vy += moveY * 0.45;
+  player.vx *= 0.82;
+  player.vy *= 0.82;
+
+  player.x += player.vx;
+  player.y += player.vy;
+
+  // Limites da tela
+  player.x = Math.max(-85, Math.min(85, player.x));
+  player.y = Math.max(-40, Math.min(50, player.y));
+
+  // Inclinação angular suave com o movimento
+  player.rotX = -player.vy * 0.04;
+  player.targetRotZ = -player.vx * 0.07;
+  player.rotZ += (player.targetRotZ - player.rotZ) * 0.2;
+
+  // Lógica do Barrel Roll
+  if (player.barrelRolling) {
+    player.barrelRollAngle += 0.35;
+    player.rotZ = player.barrelRollAngle;
+    if (player.barrelRollAngle >= Math.PI * 2) {
+      player.barrelRolling = false;
+      player.rotZ = 0;
+    }
+  }
+
+  // Disparo de lasers da Arwing (tiro duplo nas pontas das asas)
+  if (player.cooldown > 0) player.cooldown--;
+  if ((keys[' '] || keys['enter']) && player.cooldown === 0) {
+    player.cooldown = 11;
+    audio.playLaser();
+    playerLasers.push({ x: player.x - 14, y: player.y, z: player.z + 8, vz: 14 });
+    playerLasers.push({ x: player.x + 14, y: player.y, z: player.z + 8, vz: 14 });
+  }
+
+  // Atualização dos lasers do jogador
+  for (let i = playerLasers.length - 1; i >= 0; i--) {
+    const l = playerLasers[i];
+    l.z += l.vz;
+
+    // Colisão com Bunkers
+    let laserDead = false;
+    for (let b of bunkers) {
+      if (Math.abs(l.x - b.x) < 8 && Math.abs(l.y - b.y) < 8 && Math.abs(l.z - b.z) < 10) {
+        b.hp--;
+        laserDead = true;
+        createExplosion(b.x, b.y, b.z, [0, 240, 190], 4);
+        break;
+      }
+    }
+
+    // Colisão com Aliens
+    if (!laserDead) {
+      for (let a of fleet.aliens) {
+        if (!a.alive) continue;
+        const ax = fleet.x + a.relX;
+        const ay = fleet.y + a.relY;
+        const az = fleet.z;
+
+        if (Math.abs(l.x - ax) < 14 && Math.abs(l.y - ay) < 12 && Math.abs(l.z - az) < 18) {
+          killAlien(a);
+          laserDead = true;
+          break;
+        }
+      }
+    }
+
+    // Colisão com UFO Mothership
+    if (!laserDead && ufo) {
+      if (Math.abs(l.x - ufo.x) < 26 && Math.abs(l.y - ufo.y) < 14 && Math.abs(l.z - ufo.z) < 20) {
+        score += ufo.pts;
+        updateHUD();
+        audio.playExplosion(true);
+        createExplosion(ufo.x, ufo.y, ufo.z, [255, 60, 60], 25);
+        Comms.say("FALCO", "Scratch one Mothership! Great shot!");
+        ufo = null;
+        laserDead = true;
+      }
+    }
+
+    if (laserDead || l.z > 600) {
+      playerLasers.splice(i, 1);
+    }
+  }
+
+  // Atualização da Frota de Invaders (Mecânica clássica Space Invaders)
+  const aliveAliens = fleet.aliens.filter(a => a.alive);
+  if (aliveAliens.length === 0) {
+    // Vitória da Fase
+    stage++;
+    Comms.say("FOX", "Sector clear! Heading to next wave!");
+    setTimeout(() => {
+      initFleet();
+      initBunkers();
+      updateHUD();
+    }, 1800);
+    return;
+  }
+
+  // Velocidade aumenta conforme o número de invasores diminui
+  const aliveRatio = aliveAliens.length / fleet.aliens.length;
+  fleet.stepTimer++;
+  const curInterval = Math.max(6, Math.floor(fleet.stepInterval * aliveRatio));
+
+  if (fleet.stepTimer >= curInterval) {
+    fleet.stepTimer = 0;
+    fleet.x += fleet.dir * 4.5;
+    audio.playInvaderStep();
+
+    // Checa limites laterais para descer e aproximar
+    let hitEdge = false;
+    for (let a of aliveAliens) {
+      const ax = fleet.x + a.relX;
+      if (ax > 85 || ax < -85) {
+        hitEdge = true;
+        break;
+      }
+    }
+
+    if (hitEdge) {
+      fleet.dir *= -1;
+      fleet.x += fleet.dir * 4.5;
+      fleet.y -= 4; // Desce no eixo Y
+      fleet.z -= fleet.stepZAdvance; // Avança em profundidade!
+    }
+
+    // Ataque alienígena: fileira da frente dispara lasers
+    if (Math.random() < 0.45) {
+      const shooter = aliveAliens[Math.floor(Math.random() * aliveAliens.length)];
+      alienLasers.push({
+        x: fleet.x + shooter.relX,
+        y: fleet.y + shooter.relY - 6,
+        z: fleet.z,
+        vz: -6.5
+      });
+      audio.playEnemyLaser();
+    }
+  }
+
+  // Checa invasores atingindo a nave / base
+  if (fleet.z <= 60) {
+    shield = 0;
+    updateHUD();
+    gameOver("A frota invasora rompeu suas defesas!");
+    return;
+  }
+
+  // Atualização dos Lasers Inimigos
+  for (let i = alienLasers.length - 1; i >= 0; i--) {
+    const al = alienLasers[i];
+    al.z += al.vz;
+
+    // Colisão com Bunker
+    let blocked = false;
+    for (let b of bunkers) {
+      if (Math.abs(al.x - b.x) < 8 && Math.abs(al.y - b.y) < 8 && Math.abs(al.z - b.z) < 10) {
+        b.hp--;
+        blocked = true;
+        createExplosion(b.x, b.y, b.z, [0, 240, 190], 3);
+        break;
+      }
+    }
+
+    // Colisão com Jogador
+    if (!blocked && Math.abs(al.z - player.z) < 10) {
+      if (Math.abs(al.x - player.x) < 18 && Math.abs(al.y - player.y) < 10) {
+        if (player.barrelRolling) {
+          // REFLETE O TIRO COM BARREL ROLL!
+          audio.playDeflect();
+          al.vz = 14;
+          al.z = player.z + 15;
+          score += 15;
+          updateHUD();
+          createExplosion(al.x, al.y, al.z, [0, 200, 255], 6);
+          continue;
+        } else {
+          // Dano tomado
+          shield -= 25;
+          updateHUD();
+          audio.playExplosion(false);
+          createExplosion(player.x, player.y, player.z, [255, 80, 0], 12);
+          blocked = true;
+
+          if (shield <= 0) {
+            gameOver("Arwing destruída em combate!");
+            return;
+          } else {
+            Comms.say("SLIPPY", "Fox! Take evasive action!");
+          }
+        }
+      }
+    }
+
+    if (blocked || al.z < -20 || al.z > 600) {
+      alienLasers.splice(i, 1);
+    }
+  }
+
+  // Limpeza de Bunkers destruídos
+  bunkers = bunkers.filter(b => b.hp > 0);
+
+  // Mothership (UFO) Evento Bônus
+  ufoTimer++;
+  if (!ufo && ufoTimer > 700 && Math.random() < 0.02) {
+    ufo = {
+      x: -160,
+      y: 55,
+      z: 360,
+      vx: 1.6,
+      pts: (Math.floor(Math.random() * 3) + 1) * 100
+    };
+    Comms.say("FOX", "Mothership incoming! Intercept it!");
+  }
+  if (ufo) {
+    ufo.x += ufo.vx;
+    if (ufo.x > 160) {
+      ufo = null;
+      ufoTimer = 0;
+    }
+  }
+
+  // Atualização de Partículas de Explosão
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.z += p.vz;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // Estrelas de fundo
+  for (let s of stars) {
+    s.z -= s.speed;
+    if (s.z <= 10) s.z = 600;
+  }
+}
+
+function killAlien(a) {
+  a.alive = false;
+  score += a.pts;
+  updateHUD();
+  audio.playExplosion(false);
+  const ax = fleet.x + a.relX;
+  const ay = fleet.y + a.relY;
+  createExplosion(ax, ay, fleet.z, [255, 200, 0], 12);
+
+  if (Math.random() < 0.25) {
+    const cheers = [
+      { s: "FALCO", m: "Target confirmed! Nice shooting!" },
+      { s: "PEPPY", m: "Stay in formation, Fox!" },
+      { s: "SLIPPY", m: "One more down!" }
+    ];
+    const c = cheers[Math.floor(Math.random() * cheers.length)];
+    Comms.say(c.s, c.m);
+  }
+}
+
+function createExplosion(x, y, z, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y, z,
+      vx: (Math.random() - 0.5) * 4,
+      vy: (Math.random() - 0.5) * 4,
+      vz: (Math.random() - 0.5) * 4,
+      color,
+      size: Math.random() * 3 + 2,
+      life: Math.floor(Math.random() * 18 + 12)
+    });
+  }
+}
+
+function gameOver(reason) {
+  gameState = 'GAMEOVER';
+  audio.playExplosion(true);
+  document.getElementById("screen-title").innerText = "MISSION FAILED";
+  document.getElementById("screen-title").style.color = "#ff2222";
+  document.getElementById("screen-desc").innerHTML = `${reason}<br><br><b>PONTUAÇÃO FINAL: ${score}</b>`;
+  document.getElementById("start-btn").innerText = "TENTAR NOVAMENTE";
+  document.getElementById("screen-overlay").style.display = "flex";
+  Comms.say("PEPPY", "Fox! FOX! Aaaaargh!");
+}
+
+/* ==========================================================================
+   RENDERIZADOR 3D RETRO (PAINTER'S ALGORITHM & FLAT-SHADING)
+   ========================================================================== */
+function render() {
+  // Limpa tela (Preto do Espaço Sombrio)
+  ctx.fillStyle = "#040510";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Desenha Estrelas em Perspectiva
+  ctx.fillStyle = "#ffffff";
+  for (let s of stars) {
+    if (s.z <= 0) continue;
+    const px = HALF_W + (s.x * FOV) / s.z;
+    const py = HALF_H - (s.y * FOV) / s.z;
+    const size = Math.max(1, (2.5 * FOV) / s.z);
+    if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height) {
+      ctx.fillRect(px, py, size, size);
+    }
+  }
+
+  // Grade de Chão Holográfica (Estilo Planeta Corneria)
+  drawGridFloor();
+
+  // Fila de Polígonos para Ordenação (Depth Sorting)
+  const polygonQueue = [];
+
+  // 1. Converte e enfileira a Arwing
+  queueMesh(polygonQueue, MODELS.ARWING, player.x, player.y, player.z, player.rotX, player.rotY, player.rotZ, 1.0);
+
+  // 2. Invasores vivos da Frota
+  for (let a of fleet.aliens) {
+    if (!a.alive) continue;
+    const ax = fleet.x + a.relX;
+    const ay = fleet.y + a.relY;
+    const az = fleet.z;
+    const m = MODELS[a.type];
+    queueMesh(polygonQueue, m, ax, ay, az, 0, 0, 0, 1.0);
+  }
+
+  // 3. UFO Mothership
+  if (ufo) {
+    queueMesh(polygonQueue, MODELS.UFO, ufo.x, ufo.y, ufo.z, 0, Date.now() * 0.003, 0, 1.0);
+  }
+
+  // 4. Bunkers
+  for (let b of bunkers) {
+    queueMesh(polygonQueue, MODELS.BUNKER, b.x, b.y, b.z, 0, 0, 0, 1.0);
+  }
+
+  // Ordena os polígonos de trás para frente (Painter's Algorithm)
+  polygonQueue.sort((a, b) => b.avgZ - a.avgZ);
+
+  // Renderiza cada polígono ordenado
+  ctx.lineWidth = 1;
+  for (let poly of polygonQueue) {
+    ctx.beginPath();
+    ctx.moveTo(poly.pts[0].x, poly.pts[0].y);
+    for (let i = 1; i < poly.pts.length; i++) {
+      ctx.lineTo(poly.pts[i].x, poly.pts[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = poly.color;
+    ctx.fill();
+    // Borda sutil característica do chip Super FX
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.stroke();
+  }
+
+  // Efeito Visual de Escudo do Barrel Roll
+  if (player.barrelRolling) {
+    drawBarrelRollShield();
+  }
+
+  // Renderiza Lasers e Partículas (depois da geometria sólida)
+  renderLasers();
+  renderParticles();
+
+  // Retículo de Mira 3D de Star Fox
+  drawTargetReticle();
+}
+
+// Projeta e Adiciona Modelo Poligonal à Fila
+function queueMesh(queue, model, posX, posY, posZ, rX, rY, rZ, scale) {
+  // Vetor de luz direcional para shading
+  const light = { x: 0.4, y: 0.7, z: -0.6 };
+
+  // Transforma vértices do modelo
+  const transVerts = model.verts.map(v => {
+    let p = { x: v.x * scale, y: v.y * scale, z: v.z * scale };
+    if (rZ) p = rotateZ(p, rZ);
+    if (rX) p = rotateX(p, rX);
+    if (rY) p = rotateY(p, rY);
+    // Translação no mundo
+    return { x: p.x + posX, y: p.y + posY, z: p.z + posZ };
+  });
+
+  // Processa as faces
+  for (let face of model.faces) {
+    const v0 = transVerts[face.v[0]];
+    const v1 = transVerts[face.v[1]];
+    const v2 = transVerts[face.v[2]];
+
+    // Descarta se estiver atrás da câmera
+    if (v0.z <= 5 || v1.z <= 5 || v2.z <= 5) continue;
+
+    // Cálculo da Normal para Iluminação e Backface Culling
+    const ax = v1.x - v0.x, ay = v1.y - v0.y, az = v1.z - v0.z;
+    const bx = v2.x - v0.x, by = v2.y - v0.y, bz = v2.z - v0.z;
+    const nx = ay * bz - az * by;
+    const ny = az * bx - ax * bz;
+    const nz = ax * by - ay * bx;
+
+    // Projeta vértices para tela 2D
+    const pts = face.v.map(idx => {
+      const vert = transVerts[idx];
+      return {
+        x: HALF_W + (vert.x * FOV) / vert.z,
+        y: HALF_H - (vert.y * FOV) / vert.z
+      };
+    });
+
+    // Backface Culling em coordenadas de tela
+    const cross2D = (pts[1].x - pts[0].x) * (pts[2].y - pts[0].y) - (pts[1].y - pts[0].y) * (pts[2].x - pts[0].x);
+    if (cross2D <= 0) continue;
+
+    // Shading por difusão de luz
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+    const dot = Math.max(0.15, ((nx / len) * light.x + (ny / len) * light.y + (nz / len) * light.z) * 0.7 + 0.3);
+    const r = Math.floor(face.c[0] * dot);
+    const g = Math.floor(face.c[1] * dot);
+    const b = Math.floor(face.c[2] * dot);
+
+    // Média Z para ordenação
+    let avgZ = 0;
+    for (let idx of face.v) avgZ += transVerts[idx].z;
+    avgZ /= face.v.length;
+
+    queue.push({
+      pts: pts,
+      color: `rgb(${r},${g},${b})`,
+      avgZ: avgZ
+    });
+  }
+}
+
+// Chão holográfico estilo wireframe Super FX
+function drawGridFloor() {
+  const floorY = -60;
+  const zStart = 30;
+  const zEnd = 500;
+  const zStep = 45;
+  const tOffset = (Date.now() * 0.08) % zStep;
+
+  ctx.strokeStyle = "rgba(40, 80, 180, 0.4)";
+  ctx.lineWidth = 1;
+
+  // Linhas horizontais avançando
+  for (let z = zStart + (zStep - tOffset); z < zEnd; z += zStep) {
+    const yScr = HALF_H - (floorY * FOV) / z;
+    const xLeft = HALF_W + (-250 * FOV) / z;
+    const xRight = HALF_W + (250 * FOV) / z;
+    ctx.beginPath();
+    ctx.moveTo(xLeft, yScr);
+    ctx.lineTo(xRight, yScr);
+    ctx.stroke();
+  }
+  // Linhas de perspectiva longitudinais
+  for (let x = -240; x <= 240; x += 60) {
+    const x1 = HALF_W + (x * FOV) / zStart;
+    const y1 = HALF_H - (floorY * FOV) / zStart;
+    const x2 = HALF_W + (x * FOV) / zEnd;
+    const y2 = HALF_H - (floorY * FOV) / zEnd;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+}
+
+// Renderiza Lasers no Espaço
+function renderLasers() {
+  // Lasers do Jogador (Gêmeos / Verdes / Longos)
+  for (let l of playerLasers) {
+    const sx = HALF_W + (l.x * FOV) / l.z;
+    const sy = HALF_H - (l.y * FOV) / l.z;
+    const sxOld = HALF_W + (l.x * FOV) / (l.z - 22);
+    const syOld = HALF_H - (l.y * FOV) / (l.z - 22);
+
+    ctx.strokeStyle = "#44ff88";
+    ctx.lineWidth = Math.max(2, (4 * FOV) / l.z);
+    ctx.beginPath();
+    ctx.moveTo(sxOld, syOld);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+  }
+
+  // Lasers Inimigos (Vermelhos / Pulsantes)
+  for (let al of alienLasers) {
+    const sx = HALF_W + (al.x * FOV) / al.z;
+    const sy = HALF_H - (al.y * FOV) / al.z;
+    const sxTail = HALF_W + (al.x * FOV) / (al.z + 18);
+    const syTail = HALF_H - (al.y * FOV) / (al.z + 18);
+
+    ctx.strokeStyle = "#ff2244";
+    ctx.lineWidth = Math.max(2.5, (5 * FOV) / al.z);
+    ctx.beginPath();
+    ctx.moveTo(sxTail, syTail);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+  }
+}
+
+// Renderiza Partículas Poligonais de Destruição
+function renderParticles() {
+  for (let p of particles) {
+    if (p.z <= 5) continue;
+    const sx = HALF_W + (p.x * FOV) / p.z;
+    const sy = HALF_H - (p.y * FOV) / p.z;
+    const sz = Math.max(1.5, (p.size * FOV) / p.z);
+    ctx.fillStyle = `rgb(${p.color[0]}, ${p.color[1]}, ${p.color[2]})`;
+    ctx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+  }
+}
+
+// Efeito Visual do Barrel Roll
+function drawBarrelRollShield() {
+  const sx = HALF_W + (player.x * FOV) / player.z;
+  const sy = HALF_H - (player.y * FOV) / player.z;
+  const r = (32 * FOV) / player.z;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(player.barrelRollAngle * 2);
+  ctx.strokeStyle = "#00d5ff";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 1.5);
+  ctx.stroke();
+
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.7, Math.PI * 0.5, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Retículo de Mira Clássico de Star Fox
+function drawTargetReticle() {
+  // Projeta a mira à frente na profundidade média da frota
+  const aimZ = fleet.z;
+  const rx = HALF_W + (player.x * FOV) / aimZ;
+  const ry = HALF_H - ((player.y + 4) * FOV) / aimZ;
+
+  ctx.strokeStyle = "#00ffea";
+  ctx.lineWidth = 2;
+
+  // Mira em colchetes angulares [ + ]
+  const s = 14;
+  ctx.strokeRect(rx - s, ry - s, s * 2, s * 2);
+
+  ctx.beginPath();
+  ctx.moveTo(rx - s - 4, ry); ctx.lineTo(rx - s + 4, ry);
+  ctx.moveTo(rx + s - 4, ry); ctx.lineTo(rx + s + 4, ry);
+  ctx.moveTo(rx, ry - s - 4); ctx.lineTo(rx, ry - s + 4);
+  ctx.moveTo(rx, ry + s - 4); ctx.lineTo(rx, ry + s + 4);
+  ctx.stroke();
+}
+
+/* ==========================================================================
+   LOOP PRINCIPAL DO JOGO (60 FPS)
+   ========================================================================== */
+function gameLoop() {
+  update();
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// Disparo Inicial
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
