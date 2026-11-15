@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Fox Invaders: Neon Defense</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050510;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            display: inline-block;
+        }
+
+        #gameCanvas {
+            display: block;
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 24px rgba(0, 255, 204, 0.25);
+            background: radial-gradient(circle at bottom, #0a0a24 0%, #020208 100%);
+        }
+
+        #ui {
+            position: absolute;
+            top: 14px;
+            left: 18px;
+            right: 18px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .hud-text {
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 6px #00ffcc;
+        }
+
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(2, 4, 14, 0.90);
+            padding: 36px 42px;
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.35);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 5;
+            min-width: 320px;
+        }
+
+        h1 {
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #fff;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+        p {
+            margin: 0;
+            color: #cceee8;
+            line-height: 1.5;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 14px 28px;
+            background: transparent;
+            border: 2px solid #00ffcc;
+            color: #00ffcc;
+            font-family: inherit;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            background: #00ffcc;
+            color: #000;
+            box-shadow: 0 0 20px #00ffcc;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <div id="ui">
+            <div class="hud-text">SCORE: <span id="scoreEl">0</span></div>
+            <div class="hud-text">WAVE: <span id="waveEl">1</span></div>
+            <div class="hud-text">LIVES: <span id="livesEl">3</span></div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="startScreen">
+            <h1>Star Fox Invaders</h1>
+            <p>Use <strong>SETAS</strong> ou <strong>A / D</strong> para pilotar.<br>
+            <strong>ESPAÇO</strong> ou <strong>CLIQUE</strong> para atirar.<br>
+            Proteja-se atrás dos <strong>Bunkers</strong>!</p>
+            <button id="startBtn">Iniciar Missão</button>
+        </div>
+
+        <div id="gameOverScreen" class="hidden">
+            <h1 id="goTitle">GAME OVER</h1>
+            <p id="finalScore">Score Final: 0</p>
+            <button id="restartBtn">Tentar Novamente</button>
+        </div>
+    </div>
+
+<script>
+/**
+ * LÓGICA DO JOGO - Monolítico (HTML + CSS + JS)
+ * Estilo Space Invaders x Star Fox (com Bunkers Destrutíveis)
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Configurações Globais
+let width = 800;
+let height = 600;
+
+// Cores Neon
+const C_PLAYER = '#00ffcc';
+const C_BULLET_PLAYER = '#00ffff';
+const C_ENEMY_BASE = '#ff0055';
+const C_ENEMY_RED = '#ff3344';
+const C_ENEMY_ORANGE = '#ffaa00';
+const C_BULLET_ENEMY = '#ff3344';
+const C_BUNKER = '#00ff88';
+
+// Estado do Jogo
+let gameState = 'START'; // START, PLAYING, GAMEOVER
+let score = 0;
+let lives = 3;
+let wave = 1;
+let frames = 0;
+let enemyDir = 1; // 1 = direita, -1 = esquerda
+let enemyShootTimer = 0;
+let waveBannerTimer = 0;
+
+// Entidades
+let player;
+let bullets = [];
+let enemyBullets = [];
+let enemies = [];
+let bunkerBlocks = [];
+let particles = [];
+let stars = [];
+
+// Input
+const keys = {};
+const mouse = { x: 0, y: 0, down: false };
+
+// Inicialização do Canvas
+function resize() {
+    width = Math.min(window.innerWidth - 16, 800);
+    height = Math.min(window.innerHeight - 16, 600);
+    canvas.width = width;
+    canvas.height = height;
+    if (player) {
+        player.y = height - 60;
+        player.x = Math.max(player.width / 2, Math.min(width - player.width / 2, player.x));
+    }
+}
+window.addEventListener('resize', resize);
+
+// Estrelas persistentes em paralaxe
+function initStars() {
+    stars = [];
+    for (let i = 0; i < 85; i++) {
+        stars.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            speed: Math.random() * 2.2 + 0.6,
+            size: Math.random() * 2 + 1
+        });
+    }
+}
+
+// --- CLASSES ---
+
+class Player {
+    constructor() {
+        this.width = 44;
+        this.height = 34;
+        this.x = width / 2;
+        this.y = height - 60;
+        this.speed = 6.5;
+        this.tilt = 0;
+        this.color = C_PLAYER;
+        this.lastShot = 0;
+        this.invuln = 0;
+    }
+
+    update() {
+        let moving = 0;
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+            this.x -= this.speed;
+            moving = -1;
+        }
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+            this.x += this.speed;
+            moving = 1;
+        }
+
+        const targetTilt = moving * 0.22;
+        this.tilt += (targetTilt - this.tilt) * 0.2;
+
+        const halfW = this.width / 2 + 6;
+        if (this.x < halfW) this.x = halfW;
+        if (this.x > width - halfW) this.x = width - halfW;
+
+        if (this.invuln > 0) this.invuln--;
+
+        if (mouse.down || keys[' '] || keys['Spacebar']) {
+            this.shoot();
+        }
+    }
+
+    shoot() {
+        const now = Date.now();
+        if (now - this.lastShot > 190) {
+            bullets.push(new Bullet(this.x - 14, this.y - 6, 0, -13, C_BULLET_PLAYER));
+            bullets.push(new Bullet(this.x + 14, this.y - 6, 0, -13, C_BULLET_PLAYER));
+            this.lastShot = now;
+        }
+    }
+
+    draw() {
+        if (this.invuln > 0 && Math.floor(frames / 4) % 2 === 0) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.tilt);
+
+        // Chama do propulsor traseiro
+        ctx.fillStyle = '#ffaa00';
+        ctx.beginPath();
+        ctx.moveTo(-6, this.height / 2 - 6);
+        ctx.lineTo(0, this.height / 2 + 8 + Math.random() * 8);
+        ctx.lineTo(6, this.height / 2 - 6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Corpo da Arwing
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = this.color;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -this.height / 2);
+        ctx.lineTo(this.width / 2, this.height / 2);
+        ctx.lineTo(7, this.height / 2 - 8);
+        ctx.lineTo(-7, this.height / 2 - 8);
+        ctx.lineTo(-this.width / 2, this.height / 2);
+        ctx.closePath();
+        ctx.fill();
+
+        // Cabine interna
+        ctx.fillStyle = '#051525';
+        ctx.beginPath();
+        ctx.moveTo(0, -this.height / 2 + 8);
+        ctx.lineTo(5, 2);
+        ctx.lineTo(-5, 2);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class BunkerBlock {
+    constructor(x, y, size) {
+        this.x = x;
+        this.y = y;
+        this.size = size;
+        this.hp = 2;
+    }
+
+    hit() {
+        this.hp--;
+        return this.hp <= 0;
+    }
+
+    draw() {
+        ctx.save();
+        if (this.hp === 1) {
+            ctx.globalAlpha = 0.48;
+        }
+        ctx.fillStyle = C_BUNKER;
+        ctx.shadowBlur = this.hp === 2 ? 8 : 3;
+        ctx.shadowColor = C_BUNKER;
+        ctx.fillRect(this.x, this.y, this.size - 1, this.size - 1);
+
+        // Efeito de rachadura quando danificado
+        if (this.hp === 1) {
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(this.x + 2, this.y + 2, 3, 3);
+        }
+        ctx.restore();
+    }
+}
+
+class Bullet {
+    constructor(x, y, vx, vy, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.markedForDeletion = false;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+
+        if (this.y < -10 || this.y > height + 10 || this.x < -10 || this.x > width + 10) {
+            this.markedForDeletion = true;
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fillRect(this.x - 2, this.y - 7, 4, 14);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(this.x - 1, this.y - 5, 2, 10);
+        ctx.restore();
+    }
+}
+
+class Enemy {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.width = type === 2 ? 36 : 30;
+        this.height = type === 2 ? 26 : 22;
+        this.hp = type === 2 ? 2 : 1;
+        this.points = type === 2 ? 200 : (type === 1 ? 150 : 100);
+        this.color = type === 2 ? C_ENEMY_ORANGE : (type === 1 ? C_ENEMY_RED : C_ENEMY_BASE);
+    }
+
+    takeDamage() {
+        this.hp--;
+        return this.hp <= 0;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+
+        ctx.fillRect(0, 0, this.width, this.height);
+        ctx.fillRect(-3, 6, 3, 10);
+        ctx.fillRect(this.width, 6, 3, 10);
+
+        ctx.fillStyle = '#050510';
+        if (this.type === 2) {
+            ctx.fillRect(8, 8, 5, 5);
+            ctx.fillRect(this.width - 13, 8, 5, 5);
+        } else {
+            ctx.fillRect(6, 6, 4, 4);
+            ctx.fillRect(this.width - 10, 6, 4, 4);
+        }
+
+        ctx.restore();
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 3.5 + 1.5;
+        this.speedX = (Math.random() - 0.5) * 6;
+        this.speedY = (Math.random() - 0.5) * 6;
+        this.color = color;
+        this.life = 1.0;
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.life -= 0.03;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+        ctx.restore();
+    }
+}
+
+// --- FUNÇÕES DE SISTEMA ---
+
+function updateHUD() {
+    document.getElementById('scoreEl').innerText = score;
+    document.getElementById('livesEl').innerText = lives;
+    document.getElementById('waveEl').innerText = wave;
+}
+
+function createBunkers() {
+    bunkerBlocks = [];
+    const pattern = [
+        '.######.',
+        '########',
+        '########',
+        '###..###',
+        '##....##'
+    ];
+    const blockSize = 8;
+    const bunkerCount = 4;
+    const cols = pattern[0].length;
+    const bunkerWidth = cols * blockSize;
+    const bunkerY = height - 142;
+    const spacing = width / (bunkerCount + 1);
+
+    for (let i = 0; i < bunkerCount; i++) {
+        const startX = spacing * (i + 1) - bunkerWidth / 2;
+        for (let r = 0; r < pattern.length; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (pattern[r][c] === '#') {
+                    bunkerBlocks.push(new BunkerBlock(
+                        startX + c * blockSize,
+                        bunkerY + r * blockSize,
+                        blockSize
+                    ));
+                }
+            }
+        }
+    }
+}
+
+function initGame() {
+    score = 0;
+    lives = 3;
+    wave = 1;
+    player = new Player();
+    bullets = [];
+    enemyBullets = [];
+    particles = [];
+    enemies = [];
+    enemyDir = 1;
+    enemyShootTimer = 45;
+    waveBannerTimer = 60;
+
+    updateHUD();
+    createBunkers();
+    createLevel();
+    gameState = 'PLAYING';
+
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+}
+
+function createLevel() {
+    enemies = [];
+    enemyBullets = [];
+    enemyDir = 1;
+
+    const rows = Math.min(6, 4 + Math.floor((wave - 1) / 2));
+    const cols = Math.min(11, 7 + Math.floor(wave / 2));
+    const gapX = 54;
+    const gapY = 40;
+    const totalW = (cols - 1) * gapX + 36;
+    const startX = Math.max(30, (width - totalW) / 2);
+    const startY = 64;
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const x = startX + c * gapX;
+            const y = startY + r * gapY;
+
+            let type = 0;
+            if (r === 1 || r === 2) type = 1;
+            if (r === 0) type = 2;
+
+            enemies.push(new Enemy(x, y, type));
+        }
+    }
+}
+
+function spawnExplosion(x, y, color, count = 12) {
+    for (let i = 0; i < count; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+function hurtPlayer() {
+    if (player.invuln > 0) return;
+    lives--;
+    player.invuln = 90;
+    updateHUD();
+    spawnExplosion(player.x, player.y, C_PLAYER, 18);
+
+    if (lives <= 0) {
+        endGame(false);
+    }
+}
+
+function checkCollisions() {
+    // 1. Balas do Jogador vs Bunkers e Inimigos
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        if (b.markedForDeletion) continue;
+
+        for (let k = bunkerBlocks.length - 1; k >= 0; k--) {
+            const blk = bunkerBlocks[k];
+            if (b.x + 2 > blk.x && b.x - 2 < blk.x + blk.size &&
+                b.y + 7 > blk.y && b.y - 7 < blk.y + blk.size) {
+                if (blk.hit()) {
+                    bunkerBlocks.splice(k, 1);
+                }
+                spawnExplosion(b.x, b.y, C_BUNKER, 4);
+                b.markedForDeletion = true;
+                break;
+            }
+        }
+        if (b.markedForDeletion) continue;
+
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            const e = enemies[j];
+            if (b.x + 2 > e.x && b.x - 2 < e.x + e.width &&
+                b.y + 7 > e.y && b.y - 7 < e.y + e.height) {
+
+                if (e.takeDamage()) {
+                    spawnExplosion(e.x + e.width / 2, e.y + e.height / 2, e.color, 14);
+                    score += e.points;
+                    enemies.splice(j, 1);
+                    updateHUD();
+                } else {
+                    spawnExplosion(b.x, b.y, '#ffffff', 5);
+                }
+                b.markedForDeletion = true;
+                break;
+            }
+        }
+    }
+
+    // 2. Balas dos Inimigos vs Bunkers e Jogador
+    const pLeft = player.x - player.width / 2 + 4;
+    const pRight = player.x + player.width / 2 - 4;
+    const pTop = player.y - player.height / 2 + 4;
+    const pBottom = player.y + player.height / 2 - 4;
+
+    for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const eb = enemyBullets[i];
+
+        let hitBunker = false;
+        for (let k = bunkerBlocks.length - 1; k >= 0; k--) {
+            const blk = bunkerBlocks[k];
+            if (eb.x + 2 > blk.x && eb.x - 2 < blk.x + blk.size &&
+                eb.y + 7 > blk.y && eb.y - 7 < blk.y + blk.size) {
+                if (blk.hit()) {
+                    bunkerBlocks.splice(k, 1);
+                }
+                spawnExplosion(eb.x, eb.y, C_BUNKER, 5);
+                eb.markedForDeletion = true;
+                hitBunker = true;
+                break;
+            }
+        }
+        if (hitBunker) continue;
+
+        if (eb.x + 2 > pLeft && eb.x - 2 < pRight &&
+            eb.y + 7 > pTop && eb.y - 7 < pBottom) {
+            eb.markedForDeletion = true;
+            hurtPlayer();
+            if (gameState !== 'PLAYING') return;
+        }
+    }
+
+    // 3. Inimigos destruindo Bunkers ao descer + Colisão com Jogador
+    for (const e of enemies) {
+        for (let k = bunkerBlocks.length - 1; k >= 0; k--) {
+            const blk = bunkerBlocks[k];
+            if (e.x < blk.x + blk.size && e.x + e.width > blk.x &&
+                e.y < blk.y + blk.size && e.y + e.height > blk.y) {
+                spawnExplosion(blk.x + blk.size / 2, blk.y + blk.size / 2, C_BUNKER, 3);
+                bunkerBlocks.splice(k, 1);
+            }
+        }
+
+        if (e.x < pRight && e.x + e.width > pLeft &&
+            e.y < pBottom && e.y + e.height > pTop) {
+            hurtPlayer();
+            if (gameState !== 'PLAYING') return;
+        }
+        if (e.y + e.height >= player.y + player.height / 2) {
+            endGame(false);
+            return;
+        }
+    }
+}
+
+function endGame(win) {
+    gameState = 'GAMEOVER';
+    mouse.down = false;
+    const screen = document.getElementById('gameOverScreen');
+    const title = document.getElementById('goTitle');
+    const scoreText = document.getElementById('finalScore');
+
+    screen.classList.remove('hidden');
+    if (win) {
+        title.innerText = "MISSÃO CUMPRIDA!";
+        title.style.color = "#00ff66";
+    } else {
+        title.innerText = "GAME OVER";
+        title.style.color = "#ff3344";
+    }
+    scoreText.innerText = `Score Final: ${score} | Wave: ${wave}`;
+}
+
+// --- LOOP PRINCIPAL ---
+
+function loop() {
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    for (const s of stars) {
+        s.y += s.speed;
+        if (s.y > height) {
+            s.y = 0;
+            s.x = Math.random() * width;
+        }
+        ctx.fillRect(s.x, s.y, s.size, s.size);
+    }
+
+    if (gameState === 'PLAYING') {
+        player.update();
+
+        // Verifica vitória da onda e restaura os bunkers para a nova onda
+        if (enemies.length === 0) {
+            wave++;
+            waveBannerTimer = 75;
+            updateHUD();
+            createBunkers();
+            createLevel();
+        }
+
+        const baseSpeed = 1.1 + (wave - 1) * 0.22;
+        const speedBoost = Math.max(0, (32 - enemies.length) * 0.05);
+        const stepX = (baseSpeed + speedBoost) * enemyDir;
+
+        let hitEdge = false;
+        for (const e of enemies) {
+            e.x += stepX;
+            if ((enemyDir > 0 && e.x + e.width >= width - 16) ||
+                (enemyDir < 0 && e.x <= 16)) {
+                hitEdge = true;
+            }
+        }
+
+        if (hitEdge) {
+            enemyDir *= -1;
+            for (const e of enemies) {
+                e.x += enemyDir * 4;
+                e.y += 18;
+            }
+        }
+
+        enemyShootTimer--;
+        if (enemyShootTimer <= 0 && enemies.length > 0) {
+            const shooter = enemies[Math.floor(Math.random() * enemies.length)];
+            enemyBullets.push(new Bullet(
+                shooter.x + shooter.width / 2,
+                shooter.y + shooter.height,
+                0,
+                5 + Math.min(4, wave * 0.4),
+                C_BULLET_ENEMY
+            ));
+            enemyShootTimer = Math.max(18, 55 - wave * 4);
+        }
+
+        bullets.forEach(b => b.update());
+        bullets = bullets.filter(b => !b.markedForDeletion);
+
+        enemyBullets.forEach(eb => eb.update());
+        enemyBullets = enemyBullets.filter(eb => !eb.markedForDeletion);
+
+        particles.forEach(p => p.update());
+        particles = particles.filter(p => p.life > 0);
+
+        checkCollisions();
+
+        // Desenhar Bunkers, projéteis, inimigos, player e partículas
+        bunkerBlocks.forEach(blk => blk.draw());
+        bullets.forEach(b => b.draw());
+        enemyBullets.forEach(eb => eb.draw());
+        enemies.forEach(e => e.draw());
+        player.draw();
+        particles.forEach(p => p.draw());
+
+        if (waveBannerTimer > 0) {
+            waveBannerTimer--;
+            ctx.save();
+            ctx.fillStyle = '#00ffcc';
+            ctx.font = 'bold 26px Courier New';
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = '#00ffcc';
+            ctx.fillText(`WAVE ${wave}`, width / 2, height / 2);
+            ctx.restore();
+        }
+    }
+
+    frames++;
+    requestAnimationFrame(loop);
+}
+
+// --- CONTROLES ---
+
+window.addEventListener('keydown', e => {
+    if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+        e.preventDefault();
+    }
+    keys[e.key] = true;
+});
+window.addEventListener('keyup', e => {
+    keys[e.key] = false;
+});
+canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+});
+canvas.addEventListener('mousedown', e => {
+    if (e.button === 0) mouse.down = true;
+});
+window.addEventListener('mouseup', () => {
+    mouse.down = false;
+});
+
+document.getElementById('startBtn').addEventListener('click', e => {
+    e.currentTarget.blur();
+    initGame();
+});
+document.getElementById('restartBtn').addEventListener('click', e => {
+    e.currentTarget.blur();
+    initGame();
+});
+
+// Iniciar
+resize();
+initStars();
+loop();
+
+</script>
+</body>
+</html>

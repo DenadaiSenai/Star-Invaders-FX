@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1943: XENO INVADERS — Multi-Part Arcade</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #040812;
+            color: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            max-width: 96vw;
+            max-height: 96vh;
+            aspect-ratio: 4 / 3;
+            border: 4px solid #2080ff;
+            box-shadow: 0 0 0 4px #0b1936, 0 12px 42px rgba(0, 0, 0, 0.9);
+            background: #041028;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #041028;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #crtOverlay {
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(0, 0, 0, 0) 0px,
+                rgba(0, 0, 0, 0) 2px,
+                rgba(0, 0, 0, 0.20) 3px,
+                rgba(0, 0, 0, 0.20) 4px
+            );
+            pointer-events: none;
+            z-index: 4;
+        }
+        #ui {
+            position: absolute;
+            top: 8px;
+            left: 14px;
+            right: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 3;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-shadow: 2px 2px #000000;
+        }
+        .hud-col { display: flex; flex-direction: column; gap: 1px; }
+        .hud-label { font-size: clamp(10px, 1.4vw, 12px); color: #ffe000; }
+        .hud-val { font-size: clamp(14px, 2vw, 18px); color: #ffffff; }
+        #controlsBar {
+            position: absolute;
+            top: 46px;
+            right: 14px;
+            display: flex;
+            gap: 6px;
+            z-index: 6;
+        }
+        .mini-btn {
+            background: rgba(4, 16, 40, 0.9);
+            border: 2px solid #00e8ff;
+            color: #00e8ff;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 3px 8px;
+            cursor: pointer;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        .mini-btn:hover { background: #00e8ff; color: #000000; }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(4, 12, 28, 0.94);
+            padding: 18px 24px;
+            border: 4px solid #ffe000;
+            outline: 4px solid #2080ff;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            z-index: 8;
+            width: min(90%, 470px);
+            max-height: 90%;
+            overflow-y: auto;
+        }
+        h1 {
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #ffe000;
+            font-size: clamp(18px, 3vw, 24px);
+        }
+        .subtitle { color: #00e8ff; font-size: 11px; font-weight: bold; letter-spacing: 2px; }
+        p { margin: 0; color: #e6f2ff; font-size: 12px; line-height: 1.45; }
+        .tip-box {
+            background: #081c3e;
+            border: 2px solid #00ff66;
+            padding: 7px 10px;
+            font-size: 11px;
+            color: #a8ffcf;
+            line-height: 1.4;
+        }
+        .action-btn {
+            margin-top: 2px;
+            padding: 10px 22px;
+            background: #041028;
+            border: 3px solid #ffe000;
+            color: #ffe000;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .action-btn:hover { background: #ffe000; color: #000000; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <div id="ui">
+            <div class="hud-col">
+                <div class="hud-label">1UP</div>
+                <div class="hud-val" id="scoreEl">000000</div>
+            </div>
+            <div class="hud-col" style="text-align: center;">
+                <div class="hud-label" style="color: #00e8ff;">HIGH SCORE</div>
+                <div class="hud-val" style="color: #ffe000;" id="hiScoreEl">000000</div>
+            </div>
+            <div class="hud-col" style="text-align: right;">
+                <div class="hud-label" style="color: #00ff66;">MISSION</div>
+                <div class="hud-val" id="waveEl">01</div>
+            </div>
+        </div>
+
+        <div id="controlsBar">
+            <button type="button" class="mini-btn" id="muteBtn">SOM: ON</button>
+            <button type="button" class="mini-btn" id="pauseBtn">PAUSA</button>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="crtOverlay"></div>
+
+        <div id="startScreen">
+            <div class="subtitle">ESTILO 1943 • NAVES MULTI-PARTES</div>
+            <h1>1943: XENO INVADERS</h1>
+            <p>
+                Fique na linha de defesa e enfrente esquadrões alienígenas e<br>
+                <strong>Naves Capitais que você destrói parte por parte!</strong>
+            </p>
+            <div class="tip-box">
+                <strong>SETAS / A-D</strong>: Mover &nbsp;|&nbsp; <strong>ESPAÇO / CLIQUE ESQ</strong>: Atirar<br>
+                <strong>SHIFT / E / X</strong>: Loop Aéreo (Desvia de tiros!)<br>
+                <strong>B / C / CLIQUE DIR</strong>: Mega Raio (Dano em todas as partes)<br>
+                <span style="color:#ffe000;">Dica 1943: Atire no ícone <strong>POW</strong> para trocar a arma antes de pegar!</span>
+            </div>
+            <button type="button" class="action-btn" id="startBtn">DECOLAR MISSÃO</button>
+            <div style="font-size:11px; color:#00e8ff;">OU PRESSIONE ENTER / ESPAÇO</div>
+        </div>
+
+        <div id="gameOverScreen" class="hidden">
+            <h1 id="goTitle" style="color: #ff2040;">MISSION FAILED</h1>
+            <p id="finalScore">SCORE: 0</p>
+            <p id="finalStats" style="color: #00e8ff; font-size: 12px;"></p>
+            <button type="button" class="action-btn" id="restartBtn">VOAR NOVAMENTE</button>
+        </div>
+    </div>
+
+<script>
+(() => {
+    'use strict';
+
+    function boot() {
+        const canvas = document.getElementById('gameCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const width = 800;
+        const height = 600;
+        const PIXEL = 3;
+
+        // =====================================================================
+        // ÁUDIO 8-BIT CHIPTUNE (WEB AUDIO API)
+        // =====================================================================
+        const SFX = {
+            ctx: null,
+            muted: false,
+            init() {
+                try {
+                    if (!this.ctx) {
+                        const AC = window.AudioContext || window.webkitAudioContext;
+                        if (AC) this.ctx = new AC();
+                    }
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        this.ctx.resume().catch(() => {});
+                    }
+                } catch (e) { this.ctx = null; }
+            },
+            tone(f1, f2, dur, type = 'square', vol = 0.07, delay = 0) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const t = this.ctx.currentTime + delay;
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(f1, t);
+                    if (f2 !== f1) osc.frequency.exponentialRampToValueAtTime(Math.max(20, f2), t + dur);
+                    g.gain.setValueAtTime(vol, t);
+                    g.gain.exponentialRampToValueAtTime(0.002, t + dur);
+                    osc.connect(g);
+                    g.connect(this.ctx.destination);
+                    osc.start(t);
+                    osc.stop(t + dur + 0.01);
+                } catch (e) {}
+            },
+            shoot(kind) {
+                if (kind === 'LASER') this.tone(1320, 440, 0.10, 'sawtooth', 0.05);
+                else if (kind === '3-WAY') this.tone(920, 260, 0.08, 'square', 0.05);
+                else this.tone(820, 220, 0.07, 'square', 0.045);
+            },
+            hitArmor() { this.tone(420, 620, 0.05, 'triangle', 0.06); },
+            clink() { this.tone(1400, 1100, 0.05, 'square', 0.05); },
+            partBreak() {
+                this.tone(240, 55, 0.24, 'sawtooth', 0.10);
+                this.tone(160, 40, 0.28, 'square', 0.08, 0.05);
+            },
+            bossExplode() {
+                for (let i = 0; i < 4; i++) {
+                    this.tone(260 - i * 35, 38, 0.32, 'sawtooth', 0.10, i * 0.12);
+                }
+            },
+            explode() { this.tone(210, 45, 0.16, 'sawtooth', 0.08); },
+            loopManeuver() {
+                this.tone(300, 740, 0.18, 'sine', 0.07);
+                this.tone(740, 320, 0.18, 'sine', 0.06, 0.18);
+            },
+            megaLightning() {
+                this.tone(980, 90, 0.45, 'sawtooth', 0.11);
+                this.tone(620, 60, 0.48, 'square', 0.08, 0.05);
+            },
+            powCycle() { this.tone(780, 1180, 0.06, 'square', 0.06); },
+            powPickup() {
+                [523, 659, 784, 1046].forEach((f, i) => this.tone(f, f * 1.02, 0.07, 'square', 0.07, i * 0.045));
+            },
+            warning() {
+                for (let i = 0; i < 3; i++) {
+                    this.tone(620, 440, 0.14, 'square', 0.07, i * 0.22);
+                }
+            }
+        };
+
+        // =====================================================================
+        // SPRITES PIXEL ART NOVOS (ESTILO 1943 x ALIEN)
+        // =====================================================================
+        const PALETTES = {
+            PLAYER: {
+                '.': null, 'W': '#ffffff', 'S': '#b8cce0', 'G': '#6882a0',
+                'B': '#2078ff', 'C': '#00f0ff', 'R': '#ff2040', 'Y': '#ffe000'
+            },
+            VIPER: {
+                '.': null, 'P': '#b030ff', 'D': '#6810a8', 'C': '#00f0ff', 'Y': '#ffe000', 'W': '#ffffff'
+            },
+            STINGER: {
+                '.': null, 'R': '#ff2050', 'O': '#ff8800', 'D': '#901028', 'Y': '#ffe000', 'W': '#ffffff'
+            },
+            BOMBER: {
+                '.': null, 'G': '#00dd55', 'D': '#007730', 'Y': '#ffe000', 'R': '#ff2040', 'W': '#ffffff'
+            },
+            RED_SQUAD: {
+                '.': null, 'P': '#ff2040', 'D': '#990020', 'C': '#ffe000', 'Y': '#ffffff', 'W': '#ffffff',
+                'R': '#ff2040', 'O': '#ff9900', 'G': '#ff3050'
+            },
+            TURRET: {
+                '.': null, 'M': '#7888a8', 'D': '#384664', 'R': '#ff2040', 'Y': '#ffe000', 'W': '#ffffff', 'C': '#00f0ff'
+            },
+            ENGINE: {
+                '.': null, 'M': '#687898', 'D': '#303c56', 'O': '#ff7700', 'Y': '#ffe000', 'C': '#00f0ff'
+            },
+            CORE_LOCKED: {
+                '.': null, 'M': '#607088', 'D': '#283448', 'L': '#90a8c8', 'C': '#385888'
+            },
+            CORE_OPEN: {
+                '.': null, 'R': '#ff1040', 'O': '#ff7700', 'Y': '#ffe000', 'W': '#ffffff', 'D': '#660018'
+            },
+            WRECK: {
+                '.': null, 'D': '#181e2c', 'K': '#0c1018', 'O': '#603018', 'S': '#384050'
+            }
+        };
+
+        function flashPalette(pal) {
+            const out = {};
+            for (const k in pal) out[k] = pal[k] === null ? null : '#ffffff';
+            return out;
+        }
+
+        const SPRITES = {
+            PLAYER: [
+                '.......W.......',
+                '......WSW......',
+                '..W...WCW...W..',
+                '..S..WCCCW..S..',
+                '..B..WSSSW..B..',
+                '.RWWBWWWWWBWWR.',
+                'BBWWWWWSWWWWWBB',
+                'BB.WWWSWSWWW.BB',
+                'S..WW.GGG.WW..S',
+                'S..B.......B..S',
+                'R..Y.......Y..R',
+                '...............'
+            ],
+            VIPER: [
+                [
+                    '..P.....P..',
+                    '.PP..C..PP.',
+                    'PPPCCCCCPPP',
+                    'DPPPYCYPPPD',
+                    '.DPPPPPPPD.',
+                    '..DDPPPDD..',
+                    '...P...P...',
+                    '..P.....P..',
+                    '.C.......C.'
+                ],
+                [
+                    '.P.......P.',
+                    '.PP..C..PP.',
+                    'PPPCCCCCPPP',
+                    'DPPPYCYPPPD',
+                    '.DPPPPPPPD.',
+                    '..DDPPPDD..',
+                    '..P.....P..',
+                    '...P...P...',
+                    '....C.C....'
+                ]
+            ],
+            STINGER: [
+                [
+                    'R...........R',
+                    'RO....Y....OR',
+                    'RRO..RRR..ORR',
+                    '.RRROWRWORRR.',
+                    '.DRRRRRRRRRD.',
+                    '..DDRRRRRDD..',
+                    '...RR.Y.RR...',
+                    '..RR..O..RR..',
+                    '.R.........R.',
+                    '.............'
+                ],
+                [
+                    '..R.......R..',
+                    '.RO...Y...OR.',
+                    '.RRO.RRR.ORR.',
+                    'RRRROWRWORRRR',
+                    '.DRRRRRRRRRD.',
+                    '..DDRRRRRDD..',
+                    '...RR.Y.RR...',
+                    '...R..O..R...',
+                    '..R.......R..',
+                    '.............'
+                ]
+            ],
+            BOMBER: [
+                [
+                    '....GGGGG....',
+                    '..GGGGGGGGG..',
+                    '.GGYYGGGYYGG.',
+                    'GGGGGGGGGGGGG',
+                    'GDDGRRRRRGDDG',
+                    'GGGGGGGGGGGGG',
+                    '.GGGDGGGDGGG.',
+                    '..GG..G..GG..',
+                    '.YY.......YY.',
+                    '.............'
+                ],
+                [
+                    '....GGGGG....',
+                    '..GGGGGGGGG..',
+                    '.GGYYGGGYYGG.',
+                    'GGGGGGGGGGGGG',
+                    'GDDGRRRRRGDDG',
+                    'GGGGGGGGGGGGG',
+                    '.GGGDGGGDGGG.',
+                    '..GG..G..GG..',
+                    '..RR.....RR..',
+                    '.............'
+                ]
+            ],
+            TURRET: [
+                '..DDDDDD..',
+                '.DMMMMMMD.',
+                'DMMMRRMMMD',
+                'DMMYWWYMMD',
+                'DMMMRRMMMD',
+                '.DMMMMMMD.',
+                '..DDMMDDD.',
+                '..CC..CC..',
+                '..CC..CC..'
+            ],
+            ENGINE: [
+                '.OOOOOOO.',
+                '.OYYYYYO.',
+                'DDMMMMMDD',
+                'DMMMMMMMD',
+                'DMMCCCMMD',
+                'DMMMMMMMD',
+                '.DMMMMMD.',
+                '..DDDDD..',
+                '.........'
+            ],
+            CORE_LOCKED: [
+                '..DDDDDDDD..',
+                '.DLLLLLLLLD.',
+                'DLMMMMMMMMLD',
+                'DMMCCCCCCMMD',
+                'DMMCCCCCCMMD',
+                'DMMCCCCCCMMD',
+                'DLMMMMMMMMLD',
+                '.DLLLLLLLLD.',
+                '..DDDDDDDD..',
+                '............'
+            ],
+            CORE_OPEN: [
+                '..DDDDDDDD..',
+                '.DRRRRRRRRD.',
+                'DROOOOOOOORD',
+                'DROYYYYYYORD',
+                'DROYWWWWYORD',
+                'DROYYYYYYORD',
+                'DROOOOOOOORD',
+                '.DRRRRRRRRD.',
+                '..DDDDDDDD..',
+                '............'
+            ],
+            WRECK: [
+                '..KKKKKK..',
+                '.KDDDDDDK.',
+                'KDOOSSSDDK',
+                'KDOKKKKODK',
+                'KDKSSSSKDK',
+                'KDDKKOODDK',
+                '.KDDDDDDK.',
+                '..KKKKKK..',
+                '..........'
+            ]
+        };
+
+        function drawPixelSprite(grid, palette, cx, cy, pxSize = PIXEL) {
+            const rows = grid.length;
+            const cols = grid[0].length;
+            const startX = Math.round(cx - (cols * pxSize) / 2);
+            const startY = Math.round(cy - (rows * pxSize) / 2);
+            for (let r = 0; r < rows; r++) {
+                const line = grid[r];
+                for (let c = 0; c < cols; c++) {
+                    const col = palette[line[c]];
+                    if (!col) continue;
+                    ctx.fillStyle = col;
+                    ctx.fillRect(startX + c * pxSize, startY + r * pxSize, pxSize, pxSize);
+                }
+            }
+        }
+
+        // =====================================================================
+        // CENÁRIO SCROLLING ESTILO 1943 (OCEANO ALIENÍGENA, ILHAS E NUVENS)
+        // =====================================================================
+        const oceanPatches = Array.from({ length: 45 }, () => ({
+            x: Math.floor(Math.random() * width),
+            y: Math.floor(Math.random() * height),
+            w: 14 + Math.floor(Math.random() * 26),
+            speed: 1.8
+        }));
+
+        const islands = Array.from({ length: 5 }, (_, i) => ({
+            x: 70 + ((i * 170) % (width - 140)),
+            y: -120 - i * 190,
+            w: 72 + (i % 3) * 28,
+            h: 48 + (i % 2) * 24,
+            type: i % 2
+        }));
+
+        const clouds = Array.from({ length: 7 }, (_, i) => ({
+            x: Math.floor(Math.random() * width),
+            y: i * 110,
+            w: 80 + (i % 3) * 38,
+            h: 30 + (i % 2) * 16,
+            speed: 3.4 + (i % 3) * 0.7
+        }));
+
+        function updateAndDrawBackground(speedMult = 1) {
+            ctx.fillStyle = '#061534';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#0c2858';
+            for (const w of oceanPatches) {
+                w.y += w.speed * speedMult;
+                if (w.y > height + 10) {
+                    w.y = -10;
+                    w.x = Math.floor(Math.random() * width);
+                }
+                ctx.fillRect(Math.round(w.x), Math.round(w.y), w.w, 2);
+            }
+
+            for (const isl of islands) {
+                isl.y += 1.6 * speedMult;
+                if (isl.y > height + 80) {
+                    isl.y = -120 - Math.random() * 140;
+                    isl.x = 50 + Math.floor(Math.random() * (width - 140));
+                }
+                const ix = Math.round(isl.x);
+                const iy = Math.round(isl.y);
+                ctx.fillStyle = '#12466e';
+                ctx.fillRect(ix - 8, iy - 6, isl.w + 16, isl.h + 12);
+                ctx.fillStyle = '#185446';
+                ctx.fillRect(ix, iy, isl.w, isl.h);
+                ctx.fillStyle = '#20785a';
+                ctx.fillRect(ix + 10, iy + 8, isl.w - 20, isl.h - 16);
+                if (isl.type === 1) {
+                    ctx.fillStyle = '#385888';
+                    ctx.fillRect(Math.round(ix + isl.w * 0.35), Math.round(iy + isl.h * 0.3), 18, 14);
+                    ctx.fillStyle = '#00e8ff';
+                    ctx.fillRect(Math.round(ix + isl.w * 0.35 + 6), Math.round(iy + isl.h * 0.3 + 4), 6, 4);
+                }
+            }
+
+            for (const c of clouds) {
+                c.y += c.speed * speedMult;
+                if (c.y > height + 50) {
+                    c.y = -60;
+                    c.x = Math.floor(Math.random() * (width - 80));
+                }
+                ctx.fillStyle = 'rgba(155, 205, 255, 0.14)';
+                ctx.fillRect(Math.round(c.x), Math.round(c.y), c.w, c.h);
+                ctx.fillRect(Math.round(c.x + 12), Math.round(c.y - 8), c.w - 24, c.h + 14);
+            }
+        }
+
+        // =====================================================================
+        // ESTADO GLOBAL DO JOGO
+        // =====================================================================
+        const POW_TYPES = ['3-WAY', 'LASER', 'MISSILE', 'ENERGY'];
+
+        let gameState = 'START';
+        let pausedFromState = 'PLAYING';
+        let score = 0;
+        let hiScore = 0;
+        try { hiScore = Number(window.localStorage.getItem('xeno1943_hi') || 0) || 0; } catch (e) {}
+
+        let stage = 1;
+        let lives = 3;
+        let frames = 0;
+        let stateTimer = 0;
+        let waveProgress = 0;
+        let spawnTimer = 0;
+        let damageFlash = 0;
+        let megaFlash = 0;
+        let shotsFired = 0;
+        let shotsHit = 0;
+
+        let player = null;
+        let bullets = [];
+        let enemyBullets = [];
+        let fighters = [];
+        let warShips = [];
+        let powItems = [];
+        let particles = [];
+        let popups = [];
+
+        const keys = {};
+        const mouse = { down: false };
+
+        // =====================================================================
+        // JOGADOR (FIXO NA LINHA INFERIOR, MOVENDO ESQ/DIR — AS NAVES VÊM ATÉ ELE)
+        // =====================================================================
+        class Player {
+            constructor() {
+                this.width = 15 * PIXEL;
+                this.height = 12 * PIXEL;
+                this.x = width / 2;
+                this.y = height - 66;
+                this.speed = 6.2;
+                this.weapon = 'TWIN';
+                this.energy = 100;
+                this.maxEnergy = 100;
+                this.megaBombs = 2;
+                this.looping = 0;
+                this.loopCooldown = 0;
+                this.invuln = 0;
+                this.lastShot = 0;
+            }
+
+            getHitbox() {
+                return {
+                    left: this.x - 9,
+                    right: this.x + 9,
+                    top: this.y - 7,
+                    bottom: this.y + 10
+                };
+            }
+
+            triggerLoop() {
+                if (this.looping > 0 || this.loopCooldown > 0) return;
+                this.looping = 36;
+                this.loopCooldown = 85;
+                SFX.loopManeuver();
+            }
+
+            triggerMegaLightning() {
+                if (this.megaBombs <= 0) return;
+                this.megaBombs--;
+                megaFlash = 18;
+                SFX.megaLightning();
+                enemyBullets = [];
+
+                for (let i = fighters.length - 1; i >= 0; i--) {
+                    const f = fighters[i];
+                    f.hp -= 4;
+                    if (f.hp <= 0) {
+                        score += f.points;
+                        spawnExplosion(f.x + f.w / 2, f.y + f.h / 2, '#ffe000', 12);
+                        fighters.splice(i, 1);
+                    }
+                }
+
+                for (let w = warShips.length - 1; w >= 0; w--) {
+                    const ship = warShips[w];
+                    for (const part of ship.parts) {
+                        if (!part.destroyed && (!part.isCore || ship.isCoreExposed())) {
+                            ship.damagePart(part, 4);
+                        }
+                    }
+                }
+                addPopup(width / 2, height / 2, 'MEGA RAIO!', '#00f0ff');
+                updateHUD();
+            }
+
+            update() {
+                if (keys['ArrowLeft'] || keys['a'] || keys['A']) this.x -= this.speed;
+                if (keys['ArrowRight'] || keys['d'] || keys['D']) this.x += this.speed;
+
+                const halfW = this.width / 2 + 8;
+                if (this.x < halfW) this.x = halfW;
+                if (this.x > width - halfW) this.x = width - halfW;
+
+                if (this.looping > 0) this.looping--;
+                if (this.loopCooldown > 0) this.loopCooldown--;
+                if (this.invuln > 0) this.invuln--;
+
+                if ((mouse.down || keys[' '] || keys['Spacebar']) &&
+                    (gameState === 'PLAYING' || gameState === 'BOSS_FIGHT' || gameState === 'BOSS_WARNING')) {
+                    this.shoot();
+                }
+            }
+
+            shoot() {
+                const now = Date.now();
+                const cd = this.weapon === 'LASER' ? 155 : (this.weapon === 'MISSILE' ? 175 : 165);
+                if (now - this.lastShot < cd) return;
+                this.lastShot = now;
+                SFX.shoot(this.weapon);
+
+                if (this.weapon === 'TWIN') {
+                    bullets.push(new Bullet(this.x - 12, this.y - 12, 0, -12, '#00f0ff', true, 'NORMAL', 1));
+                    bullets.push(new Bullet(this.x + 12, this.y - 12, 0, -12, '#00f0ff', true, 'NORMAL', 1));
+                    shotsFired += 2;
+                } else if (this.weapon === '3-WAY') {
+                    bullets.push(new Bullet(this.x,      this.y - 16,  0,   -12, '#ffe000', true, 'NORMAL', 1));
+                    bullets.push(new Bullet(this.x - 10, this.y - 10, -2.6, -11.4, '#ffe000', true, 'NORMAL', 1));
+                    bullets.push(new Bullet(this.x + 10, this.y - 10,  2.6, -11.4, '#ffe000', true, 'NORMAL', 1));
+                    shotsFired += 3;
+                } else if (this.weapon === 'LASER') {
+                    bullets.push(new Bullet(this.x - 9, this.y - 14, 0, -14.5, '#00ffff', true, 'LASER', 2));
+                    bullets.push(new Bullet(this.x + 9, this.y - 14, 0, -14.5, '#00ffff', true, 'LASER', 2));
+                    shotsFired += 2;
+                } else if (this.weapon === 'MISSILE') {
+                    bullets.push(new Bullet(this.x,      this.y - 16, 0, -12, '#00f0ff', true, 'NORMAL', 1));
+                    bullets.push(new Bullet(this.x - 15, this.y - 4, -2.2, -7.5, '#ff7700', true, 'MISSILE', 2));
+                    bullets.push(new Bullet(this.x + 15, this.y - 4,  2.2, -7.5, '#ff7700', true, 'MISSILE', 2));
+                    shotsFired += 3;
+                }
+            }
+
+            draw() {
+                if (this.invuln > 0 && Math.floor(frames / 4) % 2 === 0) return;
+
+                ctx.save();
+                ctx.translate(Math.round(this.x), Math.round(this.y));
+
+                if (this.looping > 0) {
+                    const prog = 1 - this.looping / 36;
+                    const scale = 1 + Math.sin(prog * Math.PI) * 0.45;
+                    const squashY = Math.cos(prog * Math.PI * 2);
+                    ctx.scale(scale, Math.max(0.25, Math.abs(squashY)));
+                }
+
+                drawPixelSprite(SPRITES.PLAYER, PALETTES.PLAYER, 0, 0, PIXEL);
+
+                const f = Math.floor(frames / 3) % 2;
+                ctx.fillStyle = f === 0 ? '#ffe000' : '#ff2040';
+                ctx.fillRect(-12, 17, 4, f === 0 ? 5 : 8);
+                ctx.fillRect(8,   17, 4, f === 0 ? 5 : 8);
+                ctx.restore();
+
+                if (this.looping > 0) {
+                    ctx.strokeStyle = '#00f0ff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(Math.round(this.x - 24), Math.round(this.y - 22), 48, 44);
+                }
+            }
+        }
+
+        // =====================================================================
+        // PROJÉTEIS & POWER-UPS (ESTILO POW 1943)
+        // =====================================================================
+        class Bullet {
+            constructor(x, y, vx, vy, color, isPlayer, kind = 'NORMAL', dmg = 1) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.isPlayer = isPlayer;
+                this.kind = kind;
+                this.dmg = dmg;
+                this.markedForDeletion = false;
+            }
+
+            update() {
+                if (this.isPlayer && this.kind === 'MISSILE') {
+                    let bestTarget = null;
+                    let bestDist = Infinity;
+
+                    for (const ship of warShips) {
+                        for (const p of ship.parts) {
+                            if (p.destroyed) continue;
+                            if (p.isCore && !ship.isCoreExposed()) continue;
+                            const px = ship.x + p.relX;
+                            const py = ship.y + p.relY;
+                            const d = Math.hypot(px - this.x, py - this.y);
+                            if (d < bestDist) {
+                                bestDist = d;
+                                bestTarget = { x: px, y: py };
+                            }
+                        }
+                    }
+                    if (!bestTarget) {
+                        for (const f of fighters) {
+                            const fx = f.x + f.w / 2;
+                            const fy = f.y + f.h / 2;
+                            const d = Math.hypot(fx - this.x, fy - this.y);
+                            if (d < bestDist) {
+                                bestDist = d;
+                                bestTarget = { x: fx, y: fy };
+                            }
+                        }
+                    }
+
+                    if (bestTarget) {
+                        const dx = bestTarget.x - this.x;
+                        const dy = bestTarget.y - this.y;
+                        const len = Math.hypot(dx, dy) || 1;
+                        const spd = 8.6;
+                        this.vx += ((dx / len) * spd - this.vx) * 0.20;
+                        this.vy += ((dy / len) * spd - this.vy) * 0.20;
+                        const cur = Math.hypot(this.vx, this.vy) || 1;
+                        this.vx = (this.vx / cur) * spd;
+                        this.vy = (this.vy / cur) * spd;
+                    }
+                    if (frames % 2 === 0) {
+                        particles.push(new Particle(this.x, this.y + 4, '#ffaa00', 8));
+                    }
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y < -26 || this.y > height + 20 || this.x < -26 || this.x > width + 26) {
+                    this.markedForDeletion = true;
+                }
+            }
+
+            draw() {
+                const rx = Math.round(this.x);
+                const ry = Math.round(this.y);
+                if (this.isPlayer) {
+                    if (this.kind === 'LASER') {
+                        ctx.fillStyle = '#00f0ff';
+                        ctx.fillRect(rx - 2, ry - 14, 4, 28);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(rx - 1, ry - 12, 2, 24);
+                    } else if (this.kind === 'MISSILE') {
+                        ctx.fillStyle = '#ff6600';
+                        ctx.fillRect(rx - 4, ry - 5, 8, 10);
+                        ctx.fillStyle = '#ffe000';
+                        ctx.fillRect(rx - 2, ry - 3, 4, 6);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(rx - 1, ry - 2, 2, 3);
+                    } else {
+                        ctx.fillStyle = this.color;
+                        ctx.fillRect(rx - 2, ry - 6, 4, 12);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(rx - 1, ry - 4, 2, 8);
+                    }
+                } else {
+                    const pulse = Math.floor(frames / 3) % 2;
+                    ctx.fillStyle = pulse === 0 ? '#ff2080' : '#ffe000';
+                    ctx.fillRect(rx - 5, ry - 2, 10, 4);
+                    ctx.fillRect(rx - 2, ry - 5, 4, 10);
+                    ctx.fillStyle = '#ff0044';
+                    ctx.fillRect(rx - 4, ry - 4, 8, 8);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(rx - 2, ry - 2, 4, 4);
+                }
+            }
+        }
+
+        class PowItem {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vy = 1.6;
+                this.typeIdx = Math.floor(Math.random() * POW_TYPES.length);
+                this.hitCooldown = 0;
+                this.markedForDeletion = false;
+            }
+            cycle() {
+                if (this.hitCooldown > 0) return;
+                this.hitCooldown = 14;
+                this.typeIdx = (this.typeIdx + 1) % POW_TYPES.length;
+                this.y = Math.max(60, this.y - 24);
+                SFX.powCycle();
+            }
+            update() {
+                if (this.hitCooldown > 0) this.hitCooldown--;
+                this.y += this.vy;
+                if (this.y > height - 20) this.markedForDeletion = true;
+            }
+            draw() {
+                const kind = POW_TYPES[this.typeIdx];
+                const colors = { '3-WAY': '#ffe000', 'LASER': '#00f0ff', 'MISSILE': '#ff6600', 'ENERGY': '#00ff66' };
+                const col = colors[kind];
+                const rx = Math.round(this.x - 22);
+                const ry = Math.round(this.y - 11);
+
+                ctx.fillStyle = '#041028';
+                ctx.fillRect(rx, ry, 44, 22);
+                ctx.strokeStyle = (Math.floor(frames / 6) % 2 === 0) ? col : '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(rx, ry, 44, 22);
+
+                ctx.fillStyle = col;
+                ctx.font = 'bold 11px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(kind === 'ENERGY' ? '+ENERG' : kind, this.x, this.y + 4);
+            }
+        }
+
+        // =====================================================================
+        // ESQUADRÕES DE CAÇAS ALIENÍGENAS QUE VÊM ATÉ O JOGADOR
+        // =====================================================================
+        class AlienFighter {
+            constructor(x, y, type, behavior = 'SWOOP', isPowCarrier = false) {
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.startX = x;
+                this.behavior = behavior;
+                this.isPowCarrier = isPowCarrier;
+                this.w = (type === 'VIPER' ? 11 : 13) * PIXEL;
+                this.h = (type === 'VIPER' ? 9 : 10) * PIXEL;
+                this.hp = type === 'BOMBER' ? 3 : (type === 'STINGER' ? 2 : 1);
+                this.points = type === 'BOMBER' ? 250 : (type === 'STINGER' ? 160 : 100);
+                this.age = 0;
+                this.hitFlash = 0;
+                this.shootTimer = 45 + Math.floor(Math.random() * 65);
+            }
+
+            update() {
+                this.age++;
+                if (this.hitFlash > 0) this.hitFlash--;
+
+                const spdY = (this.type === 'VIPER' ? 2.8 : (this.type === 'STINGER' ? 2.3 : 1.7)) + Math.min(1.5, stage * 0.2);
+                this.y += spdY;
+
+                if (this.behavior === 'WEAVE') {
+                    this.x = this.startX + Math.sin(this.age * 0.055) * 85;
+                } else if (this.behavior === 'SWOOP') {
+                    const dir = this.startX < width / 2 ? 1 : -1;
+                    this.x = this.startX + Math.sin(this.age * 0.03) * 140 * dir;
+                }
+                this.x = Math.max(16, Math.min(width - this.w - 16, this.x));
+
+                this.shootTimer--;
+                if (this.shootTimer <= 0 && player && this.y > 20 && this.y < player.y - 165) {
+                    this.shootTimer = Math.max(40, 105 - stage * 10);
+                    const sx = this.x + this.w / 2;
+                    const sy = this.y + this.h;
+                    const spd = 4.6 + Math.min(2.5, stage * 0.3);
+                    let vx = ((player.x - sx) / Math.max(140, player.y - sy)) * spd;
+                    vx = Math.max(-spd * 0.45, Math.min(spd * 0.45, vx));
+                    enemyBullets.push(new Bullet(sx, sy, vx, spd, '#ff2080', false));
+                }
+            }
+
+            draw() {
+                const frame = Math.floor(frames / 8) % 2;
+                const grid = SPRITES[this.type][frame];
+                let pal = this.isPowCarrier ? PALETTES.RED_SQUAD : PALETTES[this.type];
+                if (this.hitFlash > 0) pal = flashPalette(pal);
+                drawPixelSprite(grid, pal, this.x + this.w / 2, this.y + this.h / 2, PIXEL);
+            }
+        }
+
+        // =====================================================================
+        // NAVES ALIENÍGENAS MULTI-PARTES (DESTRUIR PARTE POR PARTE!)
+        // =====================================================================
+        class MultiPartShip {
+            constructor(kind) {
+                this.kind = kind;
+                this.isBoss = (kind === 'DREADNOUGHT');
+                this.w = this.isBoss ? 270 : 148;
+                this.h = this.isBoss ? 102 : 60;
+                this.x = width / 2;
+                this.y = -this.h - 20;
+                this.targetY = this.isBoss ? 132 : 128;
+                this.vx = this.isBoss ? (1.45 + stage * 0.2) : (1.75 + stage * 0.2);
+                this.age = 0;
+                this.escortTimer = 180;
+
+                const hpScale = 1 + (stage - 1) * 0.35;
+                if (kind === 'CORVETTE') {
+                    this.name = 'CORVETA XENO-III';
+                    this.hullColor = '#3a1848';
+                    this.trimColor = '#8a2be2';
+                    this.parts = [
+                        { id: 'L_WING', name: 'CANHÃO ESQ', relX: -52, relY: 10, w: 30, h: 27, sprite: 'TURRET', hp: Math.round(6 * hpScale), maxHp: Math.round(6 * hpScale), isCore: false, destroyed: false, hitFlash: 0, fireCd: 55 },
+                        { id: 'R_WING', name: 'CANHÃO DIR', relX:  52, relY: 10, w: 30, h: 27, sprite: 'TURRET', hp: Math.round(6 * hpScale), maxHp: Math.round(6 * hpScale), isCore: false, destroyed: false, hitFlash: 0, fireCd: 80 },
+                        { id: 'CORE',   name: 'NÚCLEO',     relX:   0, relY:  0, w: 36, h: 30, sprite: 'CORE',   hp: Math.round(10 * hpScale), maxHp: Math.round(10 * hpScale), isCore: true, destroyed: false, hitFlash: 0, fireCd: 70 }
+                    ];
+                } else {
+                    this.name = stage % 2 === 1 ? 'CRUZADOR LEVIATHAN' : 'DREADNOUGHT HYDRA';
+                    this.hullColor = '#28143c';
+                    this.trimColor = '#c02060';
+                    this.parts = [
+                        { id: 'L_TURRET', name: 'ASA ESQ',     relX: -102, relY: 14,  w: 30, h: 27, sprite: 'TURRET', hp: Math.round(8 * hpScale),  maxHp: Math.round(8 * hpScale),  isCore: false, destroyed: false, hitFlash: 0, fireCd: 45 },
+                        { id: 'R_TURRET', name: 'ASA DIR',     relX:  102, relY: 14,  w: 30, h: 27, sprite: 'TURRET', hp: Math.round(8 * hpScale),  maxHp: Math.round(8 * hpScale),  isCore: false, destroyed: false, hitFlash: 0, fireCd: 65 },
+                        { id: 'L_ENG',    name: 'PROPULSOR E', relX:  -54, relY: -12, w: 27, h: 27, sprite: 'ENGINE', hp: Math.round(7 * hpScale),  maxHp: Math.round(7 * hpScale),  isCore: false, destroyed: false, hitFlash: 0, fireCd: 90 },
+                        { id: 'R_ENG',    name: 'PROPULSOR D', relX:   54, relY: -12, w: 27, h: 27, sprite: 'ENGINE', hp: Math.round(7 * hpScale),  maxHp: Math.round(7 * hpScale),  isCore: false, destroyed: false, hitFlash: 0, fireCd: 110 },
+                        { id: 'CORE',     name: 'REATOR',      relX:    0, relY: 8,   w: 36, h: 30, sprite: 'CORE',   hp: Math.round(16 * hpScale), maxHp: Math.round(16 * hpScale), isCore: true,  destroyed: false, hitFlash: 0, fireCd: 55 }
+                    ];
+                    if (stage >= 2) {
+                        this.parts.unshift(
+                            { id: 'F_L', name: 'TORRE FRONT E', relX: -48, relY: 28, w: 30, h: 27, sprite: 'TURRET', hp: Math.round(7 * hpScale), maxHp: Math.round(7 * hpScale), isCore: false, destroyed: false, hitFlash: 0, fireCd: 50 },
+                            { id: 'F_R', name: 'TORRE FRONT D', relX:  48, relY: 28, w: 30, h: 27, sprite: 'TURRET', hp: Math.round(7 * hpScale), maxHp: Math.round(7 * hpScale), isCore: false, destroyed: false, hitFlash: 0, fireCd: 75 }
+                        );
+                    }
+                }
+                this.destroyed = false;
+            }
+
+            isCoreExposed() {
+                return this.parts.every(p => p.isCore || p.destroyed);
+            }
+
+            remainingOuterCount() {
+                return this.parts.filter(p => !p.isCore && !p.destroyed).length;
+            }
+
+            damagePart(part, dmg) {
+                if (part.destroyed) return;
+                if (part.isCore && !this.isCoreExposed()) {
+                    SFX.clink();
+                    if (frames % 12 === 0) {
+                        addPopup(this.x + part.relX, this.y + part.relY - 18, 'BLINDADO! DESTRUA AS PARTES!', '#00e8ff');
+                    }
+                    return;
+                }
+
+                part.hp -= dmg;
+                part.hitFlash = 5;
+                SFX.hitArmor();
+
+                if (part.hp <= 0) {
+                    part.hp = 0;
+                    part.destroyed = true;
+                    const px = this.x + part.relX;
+                    const py = this.y + part.relY;
+
+                    if (part.isCore) {
+                        this.destroyed = true;
+                        const bonus = this.isBoss ? (1500 + stage * 500) : 600;
+                        score += bonus;
+                        SFX.bossExplode();
+                        for (let i = 0; i < 4; i++) {
+                            spawnExplosion(
+                                this.x + (Math.random() - 0.5) * this.w * 0.7,
+                                this.y + (Math.random() - 0.5) * this.h * 0.6,
+                                i % 2 === 0 ? '#ffe000' : '#ff2040',
+                                18
+                            );
+                        }
+                        addPopup(this.x, this.y, `${this.name} DESTRUÍDA! +${bonus}`, '#ffe000');
+                        powItems.push(new PowItem(this.x, this.y));
+                    } else {
+                        score += 350;
+                        SFX.partBreak();
+                        spawnExplosion(px, py, '#ff7700', 18);
+                        spawnExplosion(px, py, '#ffe000', 10);
+                        addPopup(px, py - 14, `${part.name} DESTRUÍDO! +350`, '#ffaa00');
+                        if (Math.random() < 0.65) {
+                            powItems.push(new PowItem(px, py));
+                        }
+                        if (this.isCoreExposed()) {
+                            addPopup(this.x, this.y - 36, 'NÚCLEO EXPOSTO!!', '#00ff66');
+                        }
+                    }
+                    updateHUD();
+                }
+            }
+
+            update() {
+                this.age++;
+                if (this.y < this.targetY) {
+                    this.y += 1.8;
+                } else {
+                    this.x += this.vx;
+                    const margin = this.w / 2 + 24;
+                    if (this.x > width - margin) { this.x = width - margin; this.vx = -Math.abs(this.vx); }
+                    if (this.x < margin) { this.x = margin; this.vx = Math.abs(this.vx); }
+                    this.y = this.targetY + Math.sin(this.age * 0.03) * 16;
+                }
+
+                for (const part of this.parts) {
+                    if (part.hitFlash > 0) part.hitFlash--;
+                    if (part.destroyed) {
+                        if (Math.random() < 0.14) {
+                            particles.push(new Particle(this.x + part.relX + (Math.random() - 0.5) * 10, this.y + part.relY, '#556070', 16));
+                        }
+                        continue;
+                    }
+
+                    part.fireCd--;
+                    if (part.fireCd <= 0 && this.y >= this.targetY - 20 && player) {
+                        const px = this.x + part.relX;
+                        const py = this.y + part.relY + 12;
+                        const spd = 4.6 + Math.min(2.5, stage * 0.3);
+
+                        if (part.sprite === 'TURRET') {
+                            part.fireCd = Math.max(48, 88 - stage * 6);
+                            const dy = player.y - py;
+                            let vx = ((player.x - px) / Math.max(140, dy)) * spd;
+                            vx = Math.max(-spd * 0.42, Math.min(spd * 0.42, vx));
+                            enemyBullets.push(new Bullet(px, py, vx - 0.8, spd, '#ff2080', false));
+                            enemyBullets.push(new Bullet(px, py, vx + 0.8, spd, '#ff2080', false));
+                        } else if (part.sprite === 'ENGINE') {
+                            part.fireCd = Math.max(60, 105 - stage * 7);
+                            enemyBullets.push(new Bullet(px, py, 0, spd + 0.6, '#ff2080', false));
+                        } else if (part.isCore && this.isCoreExposed()) {
+                            part.fireCd = Math.max(42, 72 - stage * 5);
+                            for (const ang of [-1.6, 0, 1.6]) {
+                                enemyBullets.push(new Bullet(px, py, ang, spd, '#ff2080', false));
+                            }
+                        } else {
+                            part.fireCd = 60;
+                        }
+                    }
+                }
+
+                if (this.isBoss && this.y >= this.targetY - 10) {
+                    this.escortTimer--;
+                    if (this.escortTimer <= 0) {
+                        this.escortTimer = Math.max(130, 220 - stage * 18);
+                        const side = Math.random() < 0.5 ? this.x - 90 : this.x + 90;
+                        fighters.push(new AlienFighter(side, this.y + 10, 'VIPER', 'SWOOP', false));
+                    }
+                }
+            }
+
+            draw() {
+                const hx = Math.round(this.x - this.w / 2);
+                const hy = Math.round(this.y - this.h / 2);
+
+                ctx.fillStyle = '#120822';
+                ctx.fillRect(hx - 4, hy + 12, this.w + 8, this.h - 24);
+
+                ctx.fillStyle = this.hullColor;
+                ctx.fillRect(hx, hy + 16, this.w, this.h - 32);
+                ctx.fillRect(hx + Math.round(this.w * 0.22), hy, Math.round(this.w * 0.56), this.h);
+
+                ctx.fillStyle = this.trimColor;
+                ctx.fillRect(hx + 8, hy + Math.round(this.h * 0.45), this.w - 16, 6);
+                ctx.fillRect(hx + Math.round(this.w * 0.3), hy + 6, Math.round(this.w * 0.4), 6);
+
+                for (const part of this.parts) {
+                    const px = this.x + part.relX;
+                    const py = this.y + part.relY;
+
+                    if (part.destroyed) {
+                        drawPixelSprite(SPRITES.WRECK, PALETTES.WRECK, px, py, PIXEL);
+                        continue;
+                    }
+
+                    let grid, pal;
+                    if (part.isCore) {
+                        const open = this.isCoreExposed();
+                        grid = open ? SPRITES.CORE_OPEN : SPRITES.CORE_LOCKED;
+                        pal = open ? PALETTES.CORE_OPEN : PALETTES.CORE_LOCKED;
+                    } else {
+                        grid = SPRITES[part.sprite];
+                        pal = PALETTES[part.sprite];
+                    }
+
+                    if (part.hitFlash > 0) pal = flashPalette(pal);
+                    drawPixelSprite(grid, pal, px, py, PIXEL);
+
+                    if (part.hp < part.maxHp) {
+                        const bw = 26;
+                        ctx.fillStyle = '#000000';
+                        ctx.fillRect(Math.round(px - bw / 2), Math.round(py - 20), bw, 4);
+                        ctx.fillStyle = part.isCore ? '#ff2040' : '#ffe000';
+                        ctx.fillRect(Math.round(px - bw / 2), Math.round(py - 20), Math.round(bw * (part.hp / part.maxHp)), 4);
+                    }
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, life = null) {
+                this.x = x;
+                this.y = y;
+                this.size = (Math.random() < 0.5 ? 3 : 5);
+                const a = Math.random() * Math.PI * 2;
+                const sp = life ? (Math.random() * 1.1 + 0.2) : (Math.random() * 4.5 + 1.4);
+                this.vx = Math.cos(a) * sp;
+                this.vy = Math.sin(a) * sp;
+                this.color = color;
+                this.life = life || (18 + Math.floor(Math.random() * 14));
+            }
+            update() { this.x += this.vx; this.y += this.vy; this.life--; }
+            draw() {
+                if (this.life < 5 && this.life % 2 === 0) return;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(Math.round(this.x), Math.round(this.y), this.size, this.size);
+            }
+        }
+
+        // =====================================================================
+        // CONTROLE DE ONDAS & BOSSES
+        // =====================================================================
+        function updateHUD() {
+            if (score > hiScore) {
+                hiScore = score;
+                try { window.localStorage.setItem('xeno1943_hi', String(hiScore)); } catch (e) {}
+            }
+            document.getElementById('scoreEl').innerText = String(score).padStart(6, '0');
+            document.getElementById('hiScoreEl').innerText = String(hiScore).padStart(6, '0');
+            document.getElementById('waveEl').innerText = String(stage).padStart(2, '0');
+        }
+
+        function spawnSquadron(waveIdx) {
+            const kind = waveIdx % 4;
+            if (kind === 0) {
+                for (let i = 0; i < 5; i++) {
+                    fighters.push(new AlienFighter(
+                        180 + i * 110,
+                        -30 - Math.abs(2 - i) * 36,
+                        'VIPER',
+                        'STRAIGHT',
+                        i === 2
+                    ));
+                }
+            } else if (kind === 1) {
+                for (let i = 0; i < 4; i++) {
+                    fighters.push(new AlienFighter(
+                        160 + i * 155,
+                        -30 - (i % 2) * 45,
+                        'STINGER',
+                        'WEAVE',
+                        i === 3
+                    ));
+                }
+            } else if (kind === 2) {
+                warShips.push(new MultiPartShip('CORVETTE'));
+                fighters.push(new AlienFighter(110, -40, 'VIPER', 'SWOOP', false));
+                fighters.push(new AlienFighter(width - 150, -40, 'VIPER', 'SWOOP', true));
+            } else {
+                for (let i = 0; i < 3; i++) {
+                    fighters.push(new AlienFighter(
+                        190 + i * 190,
+                        -40 - i * 25,
+                        'BOMBER',
+                        'STRAIGHT',
+                        i === 1
+                    ));
+                }
+            }
+        }
+
+        function startStage() {
+            gameState = 'WAVE_INTRO';
+            stateTimer = 0;
+            waveProgress = 0;
+            spawnTimer = 40;
+            fighters = [];
+            warShips = [];
+            enemyBullets = [];
+            bullets = [];
+            updateHUD();
+        }
+
+        function initGame() {
+            score = 0;
+            lives = 3;
+            stage = 1;
+            shotsFired = 0;
+            shotsHit = 0;
+            damageFlash = 0;
+            megaFlash = 0;
+            player = new Player();
+            particles = [];
+            popups = [];
+            powItems = [];
+            startStage();
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+        }
+
+        function spawnExplosion(x, y, color, count = 12) {
+            for (let i = 0; i < count; i++) particles.push(new Particle(x, y, color));
+        }
+
+        function addPopup(x, y, text, color = '#ffe000') {
+            popups.push({ x, y, text, color, life: 48 });
+        }
+
+        function hurtPlayer(dmg = 25) {
+            if (player.invuln > 0 || player.looping > 0) return;
+
+            player.energy -= dmg;
+            player.invuln = 65;
+            damageFlash = 12;
+            SFX.explode();
+            spawnExplosion(player.x, player.y, '#00f0ff', 12);
+
+            if (player.energy <= 0) {
+                lives--;
+                if (lives <= 0) {
+                    player.energy = 0;
+                    endGame('SUA ARWING FOI ABATIDA!');
+                    return;
+                }
+                player.energy = player.maxEnergy;
+                player.invuln = 110;
+                player.weapon = 'TWIN';
+                addPopup(player.x, player.y - 24, 'VIDA PERDIDA!', '#ff2040');
+            } else {
+                addPopup(player.x, player.y - 24, `-${dmg}% ENERGIA`, '#ff2040');
+            }
+        }
+
+        function checkCollisions() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                if (b.markedForDeletion) continue;
+
+                for (const pw of powItems) {
+                    if (b.x > pw.x - 24 && b.x < pw.x + 24 && b.y > pw.y - 13 && b.y < pw.y + 13) {
+                        pw.cycle();
+                        b.markedForDeletion = true;
+                        break;
+                    }
+                }
+                if (b.markedForDeletion) continue;
+
+                for (const ship of warShips) {
+                    if (ship.destroyed) continue;
+                    for (const part of ship.parts) {
+                        if (part.destroyed) continue;
+                        const px = ship.x + part.relX;
+                        const py = ship.y + part.relY;
+                        if (b.x + 4 > px - part.w / 2 && b.x - 4 < px + part.w / 2 &&
+                            b.y + 8 > py - part.h / 2 && b.y - 8 < py + part.h / 2) {
+                            shotsHit++;
+                            ship.damagePart(part, b.dmg);
+                            spawnExplosion(b.x, b.y, '#ffffff', 3);
+                            b.markedForDeletion = true;
+                            break;
+                        }
+                    }
+                    if (b.markedForDeletion) break;
+                }
+                if (b.markedForDeletion) continue;
+
+                for (let j = fighters.length - 1; j >= 0; j--) {
+                    const f = fighters[j];
+                    if (b.x + 3 > f.x + 2 && b.x - 3 < f.x + f.w - 2 &&
+                        b.y + 8 > f.y + 2 && b.y - 8 < f.y + f.h - 2) {
+                        shotsHit++;
+                        f.hp -= b.dmg;
+                        f.hitFlash = 4;
+                        if (f.hp <= 0) {
+                            score += f.points;
+                            SFX.explode();
+                            spawnExplosion(f.x + f.w / 2, f.y + f.h / 2, '#ffe000', 12);
+                            addPopup(f.x + f.w / 2, f.y, `+${f.points}`, '#ffe000');
+                            if (f.isPowCarrier) {
+                                powItems.push(new PowItem(f.x + f.w / 2, f.y + f.h / 2));
+                            }
+                            fighters.splice(j, 1);
+                            updateHUD();
+                        } else {
+                            SFX.hitArmor();
+                        }
+                        b.markedForDeletion = true;
+                        break;
+                    }
+                }
+            }
+
+            warShips = warShips.filter(w => !w.destroyed);
+
+            const pBox = player.getHitbox();
+            for (let i = powItems.length - 1; i >= 0; i--) {
+                const pw = powItems[i];
+                if (pw.x + 24 > pBox.left && pw.x - 24 < pBox.right &&
+                    pw.y + 13 > pBox.top && pw.y - 13 < pBox.bottom) {
+                    const kind = POW_TYPES[pw.typeIdx];
+                    SFX.powPickup();
+                    score += 200;
+                    if (kind === 'ENERGY') {
+                        player.energy = Math.min(player.maxEnergy, player.energy + 45);
+                        addPopup(player.x, player.y - 24, '+45% ENERGIA!', '#00ff66');
+                    } else {
+                        player.weapon = kind;
+                        addPopup(player.x, player.y - 24, `ARMA: ${kind}!`, '#ffe000');
+                    }
+                    powItems.splice(i, 1);
+                    updateHUD();
+                }
+            }
+
+            for (let i = enemyBullets.length - 1; i >= 0; i--) {
+                const eb = enemyBullets[i];
+                if (eb.x + 3 > pBox.left && eb.x - 3 < pBox.right &&
+                    eb.y + 3 > pBox.top && eb.y - 3 < pBox.bottom) {
+                    eb.markedForDeletion = true;
+                    hurtPlayer(25);
+                    if (gameState === 'GAMEOVER') return;
+                }
+            }
+
+            for (let j = fighters.length - 1; j >= 0; j--) {
+                const f = fighters[j];
+                if (f.x + 4 < pBox.right && f.x + f.w - 4 > pBox.left &&
+                    f.y + 4 < pBox.bottom && f.y + f.h - 4 > pBox.top) {
+                    spawnExplosion(f.x + f.w / 2, f.y + f.h / 2, '#ff2040', 12);
+                    fighters.splice(j, 1);
+                    hurtPlayer(35);
+                    if (gameState === 'GAMEOVER') return;
+                }
+            }
+        }
+
+        function endGame(reason) {
+            gameState = 'GAMEOVER';
+            mouse.down = false;
+            const ratio = shotsFired > 0 ? Math.round((shotsHit / shotsFired) * 100) : 0;
+            document.getElementById('finalScore').innerHTML = `${reason}<br>SCORE: ${score} &nbsp;|&nbsp; MISSION: ${stage}`;
+            document.getElementById('finalStats').innerText = `DISPAROS: ${shotsFired}  |  ACERTOS: ${shotsHit} (${ratio}%)`;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function drawBottom1943HUD() {
+            ctx.fillStyle = 'rgba(4, 12, 28, 0.90)';
+            ctx.fillRect(0, height - 38, width, 38);
+            ctx.fillStyle = '#2080ff';
+            ctx.fillRect(0, height - 39, width, 2);
+
+            for (let i = 0; i < Math.max(0, lives - 1); i++) {
+                drawPixelSprite(SPRITES.PLAYER, PALETTES.PLAYER, 22 + i * 26, height - 19, 1.6);
+            }
+
+            const bx = 92;
+            const by = height - 26;
+            const bw = 180;
+            const bh = 14;
+            ctx.fillStyle = '#ffe000';
+            ctx.font = 'bold 11px Courier New';
+            ctx.textAlign = 'left';
+            ctx.fillText('ENERGY', bx, by - 3);
+
+            ctx.fillStyle = '#081838';
+            ctx.fillRect(bx, by, bw, bh);
+            const pct = Math.max(0, player ? player.energy / player.maxEnergy : 1);
+            ctx.fillStyle = pct > 0.5 ? '#00ff66' : (pct > 0.25 ? '#ffe000' : '#ff2040');
+            ctx.fillRect(bx + 2, by + 2, Math.round((bw - 4) * pct), bh - 4);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(bx, by, bw, bh);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#00f0ff';
+            ctx.font = 'bold 13px Courier New';
+            ctx.fillText(`ARMA: ${player ? player.weapon : 'TWIN'}`, 390, height - 14);
+
+            const loopReady = player && player.loopCooldown <= 0 && player.looping <= 0;
+            ctx.fillStyle = loopReady ? '#00ff66' : '#64748b';
+            ctx.fillText(player && player.looping > 0 ? 'LOOPING!' : (loopReady ? 'LOOP [SHIFT]: OK' : 'LOOP: RECARGA'), 560, height - 14);
+
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#ffe000';
+            const bombs = player ? player.megaBombs : 2;
+            ctx.fillText(`RAIO [B]: ${'★'.repeat(bombs)}${'☆'.repeat(Math.max(0, 3 - bombs))}`, width - 16, height - 14);
+
+            if (warShips.length > 0) {
+                const ship = warShips[0];
+                const remParts = ship.remainingOuterCount();
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                ctx.fillRect(width / 2 - 170, 52, 340, 22);
+                ctx.strokeStyle = ship.isCoreExposed() ? '#00ff66' : '#ff2040';
+                ctx.strokeRect(width / 2 - 170, 52, 340, 22);
+                ctx.fillStyle = ship.isCoreExposed() ? '#00ff66' : '#ffe000';
+                ctx.font = 'bold 12px Courier New';
+                const statusTxt = ship.isCoreExposed()
+                    ? `${ship.name}: NÚCLEO EXPOSTO!`
+                    : `${ship.name}: ${remParts} PARTES + NÚCLEO`;
+                ctx.fillText(statusTxt, width / 2, 67);
+            }
+        }
+
+        // =====================================================================
+        // LOOP PRINCIPAL
+        // =====================================================================
+        function loop() {
+            const bgSpeed = (gameState === 'WAVE_INTRO' || gameState === 'STAGE_CLEAR') ? 2.4 : 1.0;
+            updateAndDrawBackground(bgSpeed);
+
+            if (gameState === 'WAVE_INTRO') {
+                stateTimer++;
+                player.update();
+                player.draw();
+                drawBottom1943HUD();
+
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#ffe000';
+                ctx.font = 'bold 28px Courier New';
+                ctx.fillText(`MISSION ${stage}`, width / 2, height / 2 - 16);
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = 'bold 16px Courier New';
+                ctx.fillText('PREPARE FOR INTERCEPT!', width / 2, height / 2 + 16);
+
+                if (stateTimer > 95) {
+                    gameState = 'PLAYING';
+                }
+
+            } else if (gameState === 'PLAYING' || gameState === 'BOSS_WARNING' || gameState === 'BOSS_FIGHT') {
+                player.update();
+
+                if (gameState === 'PLAYING') {
+                    if (warShips.length === 0) {
+                        spawnTimer--;
+                        if (spawnTimer <= 0) {
+                            if (waveProgress < 5) {
+                                spawnSquadron(waveProgress);
+                                waveProgress++;
+                                spawnTimer = waveProgress === 3 ? 220 : 155;
+                            } else if (fighters.length === 0) {
+                                gameState = 'BOSS_WARNING';
+                                stateTimer = 0;
+                                SFX.warning();
+                            }
+                        }
+                    }
+                } else if (gameState === 'BOSS_WARNING') {
+                    stateTimer++;
+                    if (stateTimer >= 120) {
+                        warShips.push(new MultiPartShip('DREADNOUGHT'));
+                        gameState = 'BOSS_FIGHT';
+                    }
+                } else if (gameState === 'BOSS_FIGHT') {
+                    if (warShips.length === 0 && fighters.length === 0) {
+                        gameState = 'STAGE_CLEAR';
+                        stateTimer = 0;
+                        player.energy = Math.min(player.maxEnergy, player.energy + 35);
+                        if (stage % 2 === 0 && player.megaBombs < 3) player.megaBombs++;
+                        SFX.powPickup();
+                    }
+                }
+
+                fighters.forEach(f => f.update());
+                fighters = fighters.filter(f => f.y < height + 40);
+                warShips.forEach(w => w.update());
+                bullets.forEach(b => b.update());
+                bullets = bullets.filter(b => !b.markedForDeletion);
+                enemyBullets.forEach(eb => eb.update());
+                enemyBullets = enemyBullets.filter(eb => !eb.markedForDeletion);
+                powItems.forEach(pw => pw.update());
+                powItems = powItems.filter(pw => !pw.markedForDeletion);
+                particles.forEach(p => p.update());
+                particles = particles.filter(p => p.life > 0);
+
+                checkCollisions();
+
+                warShips.forEach(w => w.draw());
+                fighters.forEach(f => f.draw());
+                powItems.forEach(pw => pw.draw());
+                bullets.forEach(b => b.draw());
+                enemyBullets.forEach(eb => eb.draw());
+                player.draw();
+                particles.forEach(p => p.draw());
+                drawBottom1943HUD();
+
+                if (gameState === 'BOSS_WARNING' && Math.floor(stateTimer / 10) % 2 === 0) {
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#ff2040';
+                    ctx.font = 'bold 26px Courier New';
+                    ctx.fillText('⚠ WARNING! ALIEN DREADNOUGHT ⚠', width / 2, height / 2 - 12);
+                    ctx.fillStyle = '#ffe000';
+                    ctx.font = 'bold 14px Courier New';
+                    ctx.fillText('DESTRUA AS PARTES PARA EXPOR O NÚCLEO!', width / 2, height / 2 + 16);
+                }
+
+            } else if (gameState === 'STAGE_CLEAR') {
+                stateTimer++;
+                player.update();
+                bullets.forEach(b => b.update());
+                bullets = bullets.filter(b => !b.markedForDeletion);
+                powItems.forEach(pw => pw.update());
+                powItems = powItems.filter(pw => !pw.markedForDeletion);
+                particles.forEach(p => p.update());
+                particles = particles.filter(p => p.life > 0);
+
+                checkCollisions();
+
+                powItems.forEach(pw => pw.draw());
+                bullets.forEach(b => b.draw());
+                player.draw();
+                particles.forEach(p => p.draw());
+                drawBottom1943HUD();
+
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#00ff66';
+                ctx.font = 'bold 26px Courier New';
+                ctx.fillText(`MISSION ${stage} COMPLETE!`, width / 2, height / 2 - 20);
+                ctx.fillStyle = '#ffe000';
+                ctx.font = 'bold 15px Courier New';
+                ctx.fillText('ENERGIA +35%', width / 2, height / 2 + 14);
+
+                if (stateTimer > 135) {
+                    stage++;
+                    startStage();
+                }
+
+            } else if (gameState === 'PAUSED') {
+                warShips.forEach(w => w.draw());
+                fighters.forEach(f => f.draw());
+                if (player) player.draw();
+                drawBottom1943HUD();
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.fillRect(0, 0, width, height);
+                ctx.fillStyle = '#ffe000';
+                ctx.font = 'bold 30px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSED', width / 2, height / 2);
+            } else if (gameState === 'START') {
+                drawBottom1943HUD();
+            }
+
+            if (megaFlash > 0) {
+                megaFlash--;
+                ctx.fillStyle = `rgba(180, 245, 255, ${megaFlash / 22})`;
+                ctx.fillRect(0, 0, width, height);
+                // Raios pixelados estilo 1943
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                for (let b = 0; b < 3; b++) {
+                    let lx = 140 + b * 260;
+                    ctx.beginPath();
+                    ctx.moveTo(lx, 0);
+                    for (let ly = 60; ly <= height; ly += 70) {
+                        lx += (Math.random() - 0.5) * 70;
+                        ctx.lineTo(lx, ly);
+                    }
+                    ctx.stroke();
+                }
+            }
+            if (damageFlash > 0) {
+                damageFlash--;
+                ctx.fillStyle = 'rgba(255, 32, 64, 0.25)';
+                ctx.fillRect(0, 0, width, height);
+            }
+
+            ctx.font = 'bold 13px Courier New';
+            ctx.textAlign = 'center';
+            for (let i = popups.length - 1; i >= 0; i--) {
+                const pp = popups[i];
+                pp.y -= 0.75;
+                pp.life--;
+                ctx.fillStyle = pp.color;
+                ctx.fillText(pp.text, Math.round(pp.x), Math.round(pp.y));
+                if (pp.life <= 0) popups.splice(i, 1);
+            }
+
+            frames++;
+            requestAnimationFrame(loop);
+        }
+
+        // =====================================================================
+        // CONTROLES E INICIALIZAÇÃO
+        // =====================================================================
+        function togglePause() {
+            if (['PLAYING', 'WAVE_INTRO', 'BOSS_WARNING', 'BOSS_FIGHT', 'STAGE_CLEAR'].includes(gameState)) {
+                pausedFromState = gameState;
+                gameState = 'PAUSED';
+            } else if (gameState === 'PAUSED') {
+                gameState = pausedFromState;
+            }
+        }
+
+        function handleStartClick(e) {
+            if (e) {
+                e.preventDefault();
+                if (e.currentTarget) e.currentTarget.blur();
+            }
+            SFX.init();
+            initGame();
+        }
+
+        window.addEventListener('keydown', e => {
+            if (['ArrowLeft', 'ArrowRight', ' ', 'Enter'].includes(e.key)) e.preventDefault();
+            SFX.init();
+
+            if ((gameState === 'START' || gameState === 'GAMEOVER') && (e.key === 'Enter' || e.key === ' ')) {
+                initGame();
+                return;
+            }
+
+            keys[e.key] = true;
+
+            if (player && ['PLAYING', 'BOSS_WARNING', 'BOSS_FIGHT'].includes(gameState)) {
+                if (e.key === 'Shift' || e.key === 'e' || e.key === 'E' || e.key === 'x' || e.key === 'X') {
+                    player.triggerLoop();
+                }
+                if (e.key === 'b' || e.key === 'B' || e.key === 'c' || e.key === 'C') {
+                    player.triggerMegaLightning();
+                }
+            }
+
+            if (e.key === 'p' || e.key === 'P') togglePause();
+            if (e.key === 'm' || e.key === 'M') {
+                SFX.muted = !SFX.muted;
+                document.getElementById('muteBtn').innerText = SFX.muted ? 'SOM: OFF' : 'SOM: ON';
+            }
+        });
+
+        window.addEventListener('keyup', e => { keys[e.key] = false; });
+        window.addEventListener('blur', () => {
+            for (const k in keys) keys[k] = false;
+            mouse.down = false;
+        });
+
+        canvas.addEventListener('mousedown', e => {
+            SFX.init();
+            if (e.button === 0) mouse.down = true;
+            if (e.button === 2 && player && ['PLAYING', 'BOSS_WARNING', 'BOSS_FIGHT'].includes(gameState)) {
+                player.triggerMegaLightning();
+            }
+        });
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        window.addEventListener('mouseup', () => { mouse.down = false; });
+
+        document.getElementById('startBtn').addEventListener('click', handleStartClick);
+        document.getElementById('restartBtn').addEventListener('click', handleStartClick);
+        document.getElementById('pauseBtn').addEventListener('click', e => {
+            e.currentTarget.blur();
+            togglePause();
+        });
+        document.getElementById('muteBtn').addEventListener('click', e => {
+            e.currentTarget.blur();
+            SFX.init();
+            SFX.muted = !SFX.muted;
+            document.getElementById('muteBtn').innerText = SFX.muted ? 'SOM: OFF' : 'SOM: ON';
+        });
+
+        updateHUD();
+        loop();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+</script>
+</body>
+</html>
