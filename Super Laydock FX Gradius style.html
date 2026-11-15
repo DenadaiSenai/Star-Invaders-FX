@@ -1,40 +1,16 @@
-<!-- Aqui estão todas as correções e mudanças implementadas no arquivo completo:
+<!-- Adicionado o 7º nível (RAIO) na barra Nemesis, logo após SHIELD:
 
-1. Correção do bug na contagem do Shield (3/3 → 2/3 → 1/3 → quebrado)
+O que mudou:
 
-  - Hitbox alinhada ao desenho do escudo: Quando o escudo está ativo, a colisão
-    agora usa exatamente a largura do arco desenhado à frente da nave (x ± 16, y
-    - 20 .. y + 10), evitando que tiros atravessem o gráfico do escudo sem
-    contar.
-  - Remoção imediata do projétil no impacto: O tiro inimigo agora é removido
-    imediatamente com splice() ao colidir (em vez de esperar o próximo quadro),
-    evitando contagens duplas ou tiros fantasmas.
-  - Feedback claro: O escudo continua visível mesmo enquanto a nave pisca em
-    invulnerabilidade e o popup mostra exatamente quantas cargas restam
-    (ESCUDO 2/3!, ESCUDO 1/3!, ESCUDO QUEBRADO!).
+  - Novo slot RAIO na barra Nemesis: A sequência de cápsulas agora percorre
+    SPEED → TORA → DOUBLE → LASER → OPTION → SHIELD → RAIO.
+  - Aumento de estoque de Mega Raios/Bombas: Ao ativar o slot RAIO (Shift / E /
+    Clique Direito), você ganha +1 Mega Raio (podendo acumular até 6 raios,
+    exibidos no slot como RAIO x3..RAIO x6 e no medidor [B]x...). Se já estiver
+    no máximo (6), concede +1000 pontos bônus.
+  - Integração com armadilhas: Capturar uma cápsula roxa falsa também zera o
+    estoque de raios ao nível mínimo. -->
 
-2. Dificuldade aumentada + Mais Torres Terrestres
-
-  - Inimigos mais rápidos, tiros inimigos com maior velocidade e cadência, mais
-    dano por impacto (30% por tiro / 40% colisão) e recuperação menor entre
-    fases (+25% de energia em vez de +40%).
-  - Mais Torres no Solo: Agora as torres terrestres aparecem em todas as
-    sub-ondas (de 3 até 7 torres por onda conforme a fase avança) e também
-    surgem durante a luta contra os Bosses, com versão blindada de disparo duplo
-    a partir da Fase 3.
-
-3. Menos Power-Ups + Falsos Power-Ups (Armadilhas)
-
-  - Menos Power-Ups reais: Reduzida a quantidade de carregadores nos esquadrões
-    e diminuída a chance de drop em torres (18%) e partes de Bosses (35%).
-  - Falsos Power-Ups (cor alterada para Roxo/Magenta/Ciano tóxico):
-      - Diferente da cápsula real (Laranja/Vermelha/Amarela) e da caixa de
-        energia (Verde), a cápsula falsa pisca em roxo/magenta com um X escuro
-        no centro.
-      - Ao capturar uma cápsula falsa: você perde 1 vida imediatamente e sua
-        nave é nerfada ao nível mínimo (LV.01, SPEED 0, TORA 0, 0 OPTIONS, TWIN,
-        sem SHIELD e cursor Nemesis zerado)!
- -->
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -288,10 +264,10 @@
             </div>
             <div class="tip-box">
                 <strong>[SETAS / W-A-S-D]</strong> Mover em X e Y &nbsp;|&nbsp; <strong>[ESPAÇO / CLIQUE ESQ]</strong> Atirar<br>
-                <strong>[SHIFT / E / CLIQUE DIR]</strong> Ativar Power-Up na Barra <strong>NEMESIS</strong><br>
+                <strong>[SHIFT / E / CLIQUE DIR]</strong> Ativar Power-Up na Barra <strong>NEMESIS</strong> (+ slot <strong>RAIO</strong>!)<br>
                 <strong>[M]</strong> Alternar 6 Options (<strong>SEGUIDOR / FIXO</strong>) &nbsp;|&nbsp; <strong>[Q / X]</strong> Loop Aéreo<br>
                 <strong>[B / C]</strong> Mega Raio &nbsp;|&nbsp; <strong>[P]</strong> Pausar &nbsp;|&nbsp; <strong>[N]</strong> Som ON/OFF<br>
-                <span style="color:#ff40ff;">⚠ CUIDADO COM CÁPSULAS ROXAS (X):</span> São armadilhas! Tiram 1 vida e nerfando a nave ao mínimo!
+                <span style="color:#ff40ff;">⚠ CUIDADO COM CÁPSULAS ROXAS (X):</span> São armadilhas! Tiram 1 vida e nerfam a nave ao mínimo!
             </div>
             <div class="action-row">
                 <button type="button" class="action-btn" id="startBtn">MISSION START</button>
@@ -557,7 +533,7 @@
         };
 
         // =====================================================================
-        // SPRITES PIXEL ART (INCLUINDO DART E CÁPSULA ARMADILHA ROXA)
+        // SPRITES PIXEL ART
         // =====================================================================
         const PALETTES = {
             PLAYER:  { '.': null, 'W': '#ffffff', 'S': '#b8cce0', 'G': '#6882a0', 'B': '#2078ff', 'C': '#00f0ff', 'R': '#ff2040', 'Y': '#ffe000' },
@@ -572,7 +548,6 @@
             CORE_OPEN:   { '.': null, 'R': '#ff1040', 'O': '#ff7700', 'Y': '#ffe000', 'W': '#ffffff', 'D': '#660018' },
             GROUND_TURRET: { '.': null, 'D': '#303848', 'M': '#687890', 'R': '#ff2040', 'Y': '#ffe000', 'G': '#00ff66' },
             CAPSULE: { '.': null, 'R': '#ff2040', 'O': '#ff7700', 'Y': '#ffe000', 'W': '#ffffff' },
-            // Falso Power-Up: Roxo / Magenta / Ciano ácido com núcleo X escuro!
             TRAP_A:  { '.': null, 'P': '#a000ff', 'M': '#ff00bb', 'C': '#00ffaa', 'K': '#160024' },
             TRAP_B:  { '.': null, 'P': '#ff00aa', 'M': '#7000ff', 'C': '#ffffff', 'K': '#160024' },
             ENERGY_BOX: { '.': null, 'G': '#00ee55', 'D': '#007728', 'W': '#ffffff', 'Y': '#ffe000' },
@@ -830,9 +805,9 @@
         }
 
         // =====================================================================
-        // ESTADO GLOBAL + INTRO + ENDING + CRÉDITOS
+        // ESTADO GLOBAL (7 SLOTS NA BARRA NEMESIS: + RAIO APÓS SHIELD)
         // =====================================================================
-        const NEMESIS_SLOTS = ['SPEED', 'TORA', 'DOUBLE', 'LASER', 'OPTION', 'SHIELD'];
+        const NEMESIS_SLOTS = ['SPEED', 'TORA', 'DOUBLE', 'LASER', 'OPTION', 'SHIELD', 'RAIO'];
 
         let gameState = 'INTRO';
         let pausedFromState = 'PLAYING';
@@ -890,7 +865,7 @@
 
         const CREDITS_LINES = [
             { text: 'MISSION STRIKER: XENO-43', color: '#ffe000', size: 22 },
-            { text: '15 STAGES ARCADE EDITION', color: '#00e8ff', size: 14 },
+            { text: '15 STAGES HARDCORE EDITION', color: '#00e8ff', size: 14 },
             { text: '', color: '#fff', size: 14 },
             { text: '--- HISTÓRIA DE SUCESSO ---', color: '#00ff66', size: 15 },
             { text: 'O NÚCLEO OMEGA-GILCEN FOI VAPORIZADO!', color: '#ffffff', size: 13 },
@@ -982,12 +957,10 @@
 
             getSpeed() { return 5.5 + nemesis.speedLv * 1.25; }
 
-            // Hitbox do núcleo sólido da nave
             getHitbox() {
                 return { left: this.x - 9, right: this.x + 9, top: this.y - 7, bottom: this.y + 10 };
             }
 
-            // Hitbox do Escudo quando ativo (corresponde exatamente ao arco azul desenhado!)
             getActiveBox() {
                 if (nemesis.shieldHp > 0) {
                     return { left: this.x - 16, right: this.x + 16, top: this.y - 20, bottom: this.y + 10 };
@@ -1178,7 +1151,6 @@
                     drawPixelSprite(SPRITES.OPTION, optPal, pos.x, pos.y + 4, pulse);
                 }
 
-                // Desenha a nave (pisca se invulnerável)
                 if (!(this.invuln > 0 && Math.floor(frames / 4) % 2 === 0)) {
                     ctx.save();
                     ctx.translate(Math.round(this.x), Math.round(this.y));
@@ -1202,7 +1174,6 @@
                     ctx.strokeRect(Math.round(this.x - 24), Math.round(this.y - 22), 48, 44);
                 }
 
-                // Escudo Nemesis sempre visível enquanto shieldHp > 0 (refletindo a contagem exata!)
                 if (nemesis.shieldHp > 0) {
                     const col = nemesis.shieldHp === 3 ? '#00e8ff' : (nemesis.shieldHp === 2 ? '#3080ff' : '#ff40ff');
                     ctx.fillStyle = col;
@@ -1347,7 +1318,6 @@
                         : { '.': null, 'R': '#ffe000', 'O': '#ff2040', 'Y': '#ffffff', 'W': '#00e8ff' };
                     drawPixelSprite(SPRITES.CAPSULE, pal, this.x, this.y, 3);
                 } else if (this.kind === 'TRAP') {
-                    // Falso Power-Up: Cor roxa/magenta/ciano com núcleo X escuro!
                     const pal = (Math.floor(frames / 5) % 2 === 0) ? PALETTES.TRAP_A : PALETTES.TRAP_B;
                     drawPixelSprite(SPRITES.TRAP_CAPSULE, pal, this.x, this.y, 3);
                 } else {
@@ -1583,7 +1553,6 @@
                         spawnExplosion(px, py, '#ff7700', 14);
                         spawnExplosion(px, py, '#ffe000', 8);
                         addPopup(px, py - 14, `${part.name} DESTRUÍDO! +400`, '#ffaa00');
-                        // Reduzido drop de power-up nas partes + chance de armadilha!
                         const r = Math.random();
                         if (r < 0.25) pickups.push(new Pickup(px, py, 'CAPSULE'));
                         else if (r < 0.36) pickups.push(new Pickup(px, py, 'ENERGY'));
@@ -1646,7 +1615,6 @@
                     }
                 }
 
-                // Bosses lançam mais escoltas + torres terrestres ocasionais!
                 if (this.isBoss && this.y >= this.targetY - 10) {
                     this.escortTimer--;
                     if (this.escortTimer <= 0) {
@@ -1742,7 +1710,7 @@
         }
 
         // =====================================================================
-        // HUD & ONDAS PROGRESSIVAS (MAIS TORRES, MAIS INIMIGOS, MENOS POWER-UPS)
+        // HUD & ONDAS PROGRESSIVAS (7 SLOTS NEMESIS: + RAIO APÓS SHIELD!)
         // =====================================================================
         function updateStagePickerUI() {
             const th = STAGE_THEMES[selectedStartStage - 1];
@@ -1799,6 +1767,15 @@
                 nemesis.shieldHp = 3;
                 label = 'FORCE SHIELD 3/3!';
                 SFX.speak('Escudo ativado!', false, 'Shield!');
+            } else if (slot === 'RAIO') {
+                if (player.megaBombs < 6) {
+                    player.megaBombs++;
+                    label = `+1 MEGA RAIO (${player.megaBombs}/6)!`;
+                    SFX.speak('Raio extra!', false, 'Extra lightning bomb!');
+                } else {
+                    score += 1000;
+                    label = 'MAX RAIOS +1000!';
+                }
             }
 
             nemesis.cursor = -1;
@@ -1820,7 +1797,6 @@
         function spawnSquadron(waveIdx) {
             const extra = Math.floor((stage - 1) / 2);
             const kind = (stage >= 3 && waveIdx === 4) ? 4 : (waveIdx % 4);
-            // Menos carregadores de power-up (apenas 1 por onda aérea, e alternado!)
             const allowCarrier = (waveIdx % 2 === 0 || stage >= 4);
 
             if (kind === 0) {
@@ -1850,7 +1826,6 @@
                         fighters.push(new AlienFighter(120 + d * ((width - 240) / Math.max(1, darts)), -60 - d * 35, 'DART', 'STRAIGHT', false));
                     }
                 }
-                // Torres terrestres também nesta onda!
                 spawnGroundLine(Math.min(5, 2 + Math.floor(stage / 4)));
             } else if (kind === 2) {
                 const th = STAGE_THEMES[(stage - 1) % STAGE_THEMES.length];
@@ -1920,6 +1895,7 @@
             shipLevel = 1;
             player.maxEnergy = 100;
             player.energy = 100;
+            player.megaBombs = 0;
             nemesis.cursor = -1;
             nemesis.speedLv = 0;
             nemesis.toraLv = 0;
@@ -1968,7 +1944,6 @@
             if (popups.length < 24) popups.push({ x, y, text, color, life: 48 });
         }
 
-        // Acionado ao capturar um Falso Power-Up (Armadilha Roxa!)
         function triggerFakePowerup(pkX, pkY) {
             lives--;
             damageFlash = 18;
@@ -1996,7 +1971,7 @@
 
             if (nemesis.shieldHp > 0) {
                 nemesis.shieldHp--;
-                player.invuln = 26; // Invulnerabilidade breve e precisa para o próximo tiro contar 100% certo
+                player.invuln = 26;
                 damageFlash = 6;
                 SFX.shieldBlock();
                 spawnExplosion(player.x, player.y - 16, '#00e8ff', 10);
@@ -2075,7 +2050,6 @@
                             SFX.explode();
                             spawnExplosion(gt.x + 15, gt.y + 12, '#00ff66', 12);
                             addPopup(gt.x + 15, gt.y, gt.heavy ? '+400 SOLO' : '+250 SOLO', '#00ff66');
-                            // Menos power-ups reais + chance de cápsula falsa!
                             const r = Math.random();
                             if (r < 0.12) pickups.push(new Pickup(gt.x + 15, gt.y + 12, 'CAPSULE'));
                             else if (r < 0.19) pickups.push(new Pickup(gt.x + 15, gt.y + 12, 'ENERGY'));
@@ -2106,11 +2080,9 @@
                             spawnExplosion(f.x + f.w / 2, f.y + f.h / 2, '#ffe000', 10);
                             addPopup(f.x + f.w / 2, f.y, `+${f.points}`, '#ffe000');
                             if (f.isCarrier) {
-                                // Carregador solta Capsule real na maioria, ou TRAP ocasional em fases avançadas!
                                 const trapChance = Math.min(0.32, 0.14 + stage * 0.015);
                                 pickups.push(new Pickup(f.x + f.w / 2, f.y + f.h / 2, Math.random() < trapChance ? 'TRAP' : 'CAPSULE'));
                             } else if (Math.random() < (0.04 + stage * 0.005) && f.y < player.y - 120) {
-                                // Inimigos comuns podem soltar armadilhas roxas se estiverem longe do jogador
                                 pickups.push(new Pickup(f.x + f.w / 2, f.y + f.h / 2, 'TRAP'));
                             }
                             fighters.splice(j, 1);
@@ -2154,7 +2126,6 @@
                 }
             }
 
-            // Tiros inimigos contra Shield (se ativo) ou contra núcleo da nave (removidos com splice imediatamente!)
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
                 const eb = enemyBullets[i];
                 if (eb.x + 3 > shieldBox.left && eb.x - 3 < shieldBox.right &&
@@ -2460,7 +2431,7 @@
         }
 
         // =====================================================================
-        // HUD INFERIOR NEMESIS + RADIO SUBTITLE
+        // HUD INFERIOR NEMESIS (7 SLOTS: SPEED..SHIELD..RAIO)
         // =====================================================================
         function drawNemesisBottomHUD() {
             ctx.fillStyle = '#040814';
@@ -2493,13 +2464,14 @@
                 ctx.fillRect(ex + 3 + c * 11, ey + 3, 8, eh - 6);
             }
 
-            const slotW = 72;
+            // 7 Slots da barra Nemesis ajustados entre x=142 e x=642
+            const slotW = 68;
             const slotH = 20;
             const gap = 4;
-            const startX = 148;
+            const startX = 142;
             const sy = height - 28;
 
-            ctx.font = 'bold 11px Courier New';
+            ctx.font = 'bold 10px Courier New';
             ctx.textAlign = 'center';
             for (let i = 0; i < NEMESIS_SLOTS.length; i++) {
                 const sx = startX + i * (slotW + gap);
@@ -2521,9 +2493,13 @@
                     isActive = true;
                 } else if (name === 'OPTION') {
                     if (nemesis.options > 0) { label = `OPT ${nemesis.options}/6`; isActive = true; }
-                } else if (name === 'SHIELD' && nemesis.shieldHp > 0) {
-                    label = `SHD ${nemesis.shieldHp}/3`;
-                    isActive = true;
+                } else if (name === 'SHIELD') {
+                    if (nemesis.shieldHp > 0) { label = `SHD ${nemesis.shieldHp}/3`; isActive = true; }
+                } else if (name === 'RAIO') {
+                    if (player && player.megaBombs > 0) {
+                        label = `RAIO x${player.megaBombs}`;
+                        isActive = player.megaBombs > 2;
+                    }
                 }
 
                 if (selected) {
@@ -2547,7 +2523,7 @@
             const optModeTxt = nemesis.optionFixed ? 'OPT[M]:FIXO' : 'OPT[M]:SEGUE';
             ctx.fillStyle = nemesis.optionFixed ? '#00e8ff' : '#ffe000';
             ctx.font = 'bold 10px Courier New';
-            ctx.fillText(`NEMESIS [SHIFT/DIR] | ${optModeTxt}`, startX + 225, sy - 4);
+            ctx.fillText(`NEMESIS [SHIFT/DIR] | ${optModeTxt}`, startX + 250, sy - 4);
 
             for (let i = 0; i < Math.max(0, lives - 1); i++) {
                 drawPixelSprite(SPRITES.PLAYER, PALETTES.PLAYER, width - 26 - i * 28, height - 20, 1.5);
@@ -2681,9 +2657,8 @@
                                     SFX.powerActivate();
                                     SFX.speak('Fase concluída!', true, 'Stage complete!');
                                 }
-                                // Recupera menos energia entre fases (+25%) para manter o desafio alto
                                 player.energy = Math.min(player.maxEnergy, player.energy + 25);
-                                if (stage % 3 === 0 && player.megaBombs < 3) player.megaBombs++;
+                                if (stage % 3 === 0 && player.megaBombs < 6) player.megaBombs++;
                             }
                         }
                     }
